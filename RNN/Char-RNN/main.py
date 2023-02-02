@@ -64,11 +64,13 @@ class Dataloader:
     self.names = names
     self.tags = tags
 
-  def name_2_tensor(self, name):
-    return F.one_hot(torch.tensor([all_letters.index(char) for char in name]), num_classes=n_letters)
+  def name_2_tensor(self, name: str) -> torch.Tensor:
+    tmp_one_hot = F.one_hot(torch.tensor([all_letters.index(char) for char in name]), num_classes=n_letters)
+    return torch.unsqueeze(tmp_one_hot, -2)
 
-  def tag_2_tensor(self, name):
-    
+  def tag_2_tensor(self, tag: str) -> torch.Tensor:
+    tmp_one_hot = F.one_hot(torch.tensor([all_categories.index(tag)]), num_classes=len(all_categories))
+    return torch.unsqueeze(tmp_one_hot, 0)
 
   def __len__(self):
     return len(names)
@@ -76,7 +78,7 @@ class Dataloader:
   def __getitem__(self, index):
     name = self.names[index]
     tag = self.tags[index]
-    return self.name_2_tensor(name), tag
+    return self.name_2_tensor(name), self.tag_2_tensor(tag)
 
 class RNN(nn.Module):
   def __init__(self, dim_input, dim_hidden, dim_output):
@@ -97,3 +99,43 @@ class RNN(nn.Module):
 
   def init_hidden(self):
     return torch.zeros((1, self.dim_hidden))
+
+
+class TrainingArgs:
+  def __init__(self, learning_rate: float, num_batch: int):
+    self.learning_rate = learning_rate
+    self.num_batch = num_batch
+
+
+class Trainer:
+  def __init__(self, model=None, training_args=None, data_loader=None):
+    self.args = training_args
+    self.model = model
+    self.data_loader = data_loader
+    self.loss = nn.NLLLoss()
+  
+  def train_step(self, input, label):
+    hidden = self.model.init_hidden()
+    self.model.zero_grad()
+    
+    for i in range(input.size()[0]):
+      output, hidden = self.model(input[i], hidden)
+    
+    loss = self.loss(output, label)
+    loss.backward()
+
+    for p in self.model.parameters():
+      p.data.add_(p.grad.data, alpha=-self.args.learning_rate)
+    
+    return output, loss.item()
+
+  def train(self):
+    for batch in range(self.args.num_batch):
+      current_loss = 0
+      for input, label in self.data_loader:
+        output, loss = self.train_step(input, label)
+        current_loss += loss
+      print(current_loss)
+      
+
+      

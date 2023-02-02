@@ -43,7 +43,7 @@ def main():
   names, tags, all_letters, all_categories = read_data(data_pth)
   data = split_data(names, tags, random_seed=1)
   training_args = TrainingArgs(
-    learning_rate=0.001, 
+    learning_rate=0.005,
     num_epochs=300
   )
   data_loader = Dataloader(names=data['train']['names'], tags=data['train']['tags'], all_letters=all_letters, all_categories=all_categories)

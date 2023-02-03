@@ -71,9 +71,9 @@ class Dataloader:
     return torch.unsqueeze(tmp_one_hot, 0)
 
   def __len__(self):
-    return len(names)
+    return len(self.names)
 
   def __getitem__(self, index):
     name = self.names[index]
     tag = self.tags[index]
-    return self.name_2_tensor(name), self.tag_2_tensor(tag)
+    return (self.name_2_tensor(name), self.tag_2_tensor(tag)), (name, tag)

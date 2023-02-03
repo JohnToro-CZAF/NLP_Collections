@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
-from models import RNN, LSTM
+import torch.nn.functional as F
+from models.rnn import RNN
+from models.lstm import LSTM
 from data import read_data, split_data, Dataloader
 
 class TrainingArgs:
@@ -15,6 +17,7 @@ class Trainer:
     self.data_loader_train = data_loader_train
     self.data_loader_val = data_loader_val
     self.loss = nn.NLLLoss()
+    self.optimizer = torch.optim.Adam(model.parameters(), lr = self.args.learning_rate)
   
   def train_step(self, input, label):
     hidden = self.model.init_hidden()
@@ -25,38 +28,51 @@ class Trainer:
     # print(output, label)
     loss = self.loss(output[0], label[0][0]) # Since the dimension of label default is with (len_seq, batch_size, all_categories), here batchsize is 0 and we also only take final output layer -> 0
     loss.backward()
-
-    for p in self.model.parameters():
-      p.data.add_(p.grad.data, alpha=-self.args.learning_rate)
+    self.optimizer.step()
     
     return output, loss.item()
 
   def eval_step(self, input, label):
-    hidden = self.model.init_hidden()
-    for i in range(input.size())[0]:
-      output, hidden = self.model(input[i], hidden)
+    with torch.no_grad():
+      hidden = self.model.init_hidden()
+      for i in range(input.size()[0]):
+        output, hidden = self.model(input[i], hidden)
     
     loss = self.loss(output[0], label[0][0])
-    return output, loss
+    return output, loss.item()
 
   def eval(self, current_epoch):
     total_loss = 0
     correct_ans = 0
-    for input, label in self.data_loader_val:
+    for (input, label), (input_raw, label_raw) in self.data_loader_val:
       output, loss = self.eval_step(input, label)
       total_loss += loss
-      pred = F.one_hot([self.all_categories.index(torch.argmax(output, dim=1))], len(self.all_categories))
-      if label == pred:
+      # pred_category = torch.argmax(output, dim=1)
+      top_n, top_i = output.topk(1)
+      category_i = top_i[0].item()
+      if category_i == self.data_loader_val.all_categories.index(label_raw):
         correct_ans += 1
-    print("Current epoch has loss: ", total_loss)
+    
+    print("Current loss on val is: ", total_loss/len(self.data_loader_val))
     print("Curren acc on val is: ", correct_ans/len(self.data_loader_val))
   
   def train(self):
     for epoch in range(self.args.num_epochs):
-      current_loss = 0
-      for input, label in self.data_loader_train:
+      total_loss = 0
+      correct_ans = 0
+      for (input, label), (raw_input, raw_label) in self.data_loader_train:
         output, loss = self.train_step(input, label)
-        current_loss += loss
+        total_loss += loss
+        # pred_category = torch.argmax(output, dim=1)
+        top_n, top_i = output.topk(1)
+        category_i = top_i[0].item()
+
+        if category_i == self.data_loader_train.all_categories.index(raw_label):
+          correct_ans += 1  
+     
+      print("-"*10 + str(epoch) + "-"*10)    
+      print("Current loss on train is: ", total_loss/len(self.data_loader_train))
+      print("Curren acc on val is: ", correct_ans/len(self.data_loader_train))
       self.eval(epoch)
 
 def main():
@@ -64,9 +80,10 @@ def main():
   names, tags, all_letters, all_categories = read_data(data_pth)
   data = split_data(names, tags, random_seed=1)
   training_args = TrainingArgs(
-    learning_rate=0.005,
+    learning_rate=0.00001,
     num_epochs=300
   )
+  
   data_loader_train = Dataloader(names=data['train']['names'], tags=data['train']['tags'], all_letters=all_letters, all_categories=all_categories)
   data_loader_val = Dataloader(names=data['val']['names'], tags=data['val']['tags'], all_letters=all_letters, all_categories=all_categories)
   model = RNN(len(all_letters), 128, len(all_categories))

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class LSTM(nn.Moudle):
+class LSTM(nn.Module):
   def __init__(self, dim_input, dim_hidden, dim_output):
     super().__init__()
     self.dim_input = dim_input
@@ -37,7 +37,7 @@ class LSTM(nn.Moudle):
     H = self.tanh(C_new) * O_gate
     output = self.ic2o(torch.concat((input, H), dim=1))
     output = self.softmax(output)
-    
+
     return output, (H, C_new)
 
   def init_hidden(self):

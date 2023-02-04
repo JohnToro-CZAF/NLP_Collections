@@ -24,9 +24,9 @@ class Trainer:
 
   def eval_step(self, input, label):
     with torch.no_grad():
-      hidden = self.model.init_hidden()
+      hidden = self.model.init_hidden(input.size()[0])
       for i in range(input.size()[0]):
-        output, hidden = self.model(input[i], hidden)
+        output, hidden = self.model(input[:,i,:], hidden)
     
     loss = self.loss(output, label)
     return output, loss
@@ -39,39 +39,44 @@ class Trainer:
     val_loss = []
     for input, label in self.val_loader:
       output, loss = self.eval_step(input, label)
-      batch_acc = acc_in_batch(output, label)
+      batch_acc = self.acc_in_batch(output, label)
 
       val_acc.append(batch_acc/input.size()[0])
-      val_loss.append(torch.sum(loss, dim=1).item()/input.size()[0])
+      val_loss.append(loss.item()/input.size()[0])
     
     print("Curren acc on val is: ", np.mean(val_acc))
     print("Current loss on val is: ", np.mean(val_loss))
   
   def train_step(self, input, label):
-    hidden = self.model.init_hidden()
-    self.optimizer.zero_grad()
-    
+    hidden = self.model.init_hidden(batch_size=input.size()[0])
+    # print(input)
+    # print(input[:, 1, :])
     for i in range(input.size()[0]):
-      output, hidden = self.model(input[i], hidden)
-
-    loss = self.loss(output, label)
-    torch.sum(loss, dim=1).backward()
-    
-    self.optimizer.step()    
+      output, hidden = self.model(input[:, i, :], hidden)
+    loss = self.loss(output, label) 
     return output, loss
 
   def train(self):
     for epoch in range(self.args.num_epochs):
-      train_loss, train_acc = []
+      train_acc = []
+      train_loss_arr = []
+      train_loss = 0
+      self.optimizer.zero_grad()
+
       for input, label in self.train_loader:
+        # print(input.size(), label.size())
         output, loss = self.train_step(input, label)
-        batch_acc = acc_in_batch(output, label)
-
+        batch_acc = self.acc_in_batch(output, label)
+        # print(output.size(), label.size())
+        # print(batch_acc)
+        train_loss += loss
+        train_loss_arr.append(loss.item()/input.size()[0])
         train_acc.append(batch_acc/input.size()[0])
-        train_loss.append(torch.sum(loss, dim=1).item()/input.size()[0])
 
+      train_loss.backward()
+      self.optimizer.step()   
       print("-"*10 + str(epoch) + "-"*10)    
-      print("Current loss on train is: ", np.mean(train_loss))
+      print("Current loss on train is: ", np.mean(train_loss_arr))
       print("Curren acc on train is: ", np.mean(train_acc))
       self.eval(epoch)
 
@@ -80,16 +85,30 @@ def main():
   names, tags, all_letters, all_categories = read_data(data_pth)
   data = split_data(names, tags, random_seed=1)
   training_args = TrainingArgs(
-    learning_rate=0.005,
+    learning_rate=0.0001,
     num_epochs=300
   )
   
-  data_train = NameDataset(names=data['train']['names'], tags=data['train']['tags'], all_letters=all_letters, all_categories=all_categories)
-  data_val = NameDataset(names=data['val']['names'], tags=data['val']['tags'], all_letters=all_letters, all_categories=all_categories)
-  # model = RNN(len(all_letters), 128, len(all_categories))
-  train_loader = DataLoader(data_train, batch_size=4)
-  val_loader = DataLoader(data_val, batch_size=4)
-  model = LSTM(len(all_letters), 128, len(all_categories))
+  data_train = NameDataset(
+    names=data['train']['names'], 
+    tags=data['train']['tags'], 
+    all_letters=all_letters, 
+    all_categories=all_categories,
+    max_length=20
+  )
+
+  data_val = NameDataset(
+    names=data['val']['names'], 
+    tags=data['val']['tags'], 
+    all_letters=all_letters, 
+    all_categories=all_categories,
+    max_length=20
+  )
+  train_loader = DataLoader(data_train, batch_size=1)
+  val_loader = DataLoader(data_val, batch_size=1)
+
+  model = RNN(len(all_letters), 256, len(all_categories), batch_size=1)
+  # model = LSTM(len(all_letters), 128, len(all_categories), batch_size=1)
   trainer = Trainer(
     model=model, 
     training_args=training_args, 

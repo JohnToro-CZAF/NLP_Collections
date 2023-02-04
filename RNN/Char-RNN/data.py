@@ -57,7 +57,7 @@ def split_data(names: List, tags: List, random_seed: int):
 from torch.nn import functional as F
 from torch.utils.data import Dataset
 class NameDataset(Dataset):
-  def __init__(self, names: List[str], tags: List[str], all_letters: List[str], all_categories: List[str]):
+  def __init__(self, names: List[str], tags: List[str], all_letters: List[str], all_categories: List[str], max_length: int):
     super(NameDataset, self).__init__()
     self.names = names
     self.tags = tags
@@ -67,11 +67,14 @@ class NameDataset(Dataset):
 
   def name_2_tensor(self, name: str) -> torch.Tensor:
     # Padding '.' to name tensor
-    padded_name = [self.all_letters.index(char) for char in name] + (self.max_length - len(name)) * [len(self.all_categories) - 1]
-    return F.one_hot(torch.tensor(padded_name), num_classes=len(self.all_letters))
+    name_idx = [self.all_letters.index(char) for char in name]
+    name_tensor = F.one_hot(torch.tensor(name_idx), num_classes=len(self.all_letters))
+    pad_tensor = torch.zeros((self.max_length - len(name), len(self.all_letters)))
+    padded_tensor = torch.concat([name_tensor, pad_tensor], dim=0)
+    return padded_tensor
 
   def tag_2_tensor(self, tag: str) -> torch.Tensor:
-    return torch.tensor([self.all_categories.index(tag)]).view(1, ) 
+    return torch.tensor(self.all_categories.index(tag))
 
   def __len__(self):
     return len(self.names)

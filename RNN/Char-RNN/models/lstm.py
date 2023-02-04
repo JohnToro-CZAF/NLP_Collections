@@ -3,11 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class LSTM(nn.Module):
-  def __init__(self, dim_input, dim_hidden, dim_output):
+  def __init__(self, dim_input, dim_hidden, dim_output, batch_size):
     super().__init__()
     self.dim_input = dim_input
     self.dim_hidden = dim_hidden
     self.dim_output = dim_output
+    self.batch_size = batch_size
 
     self.ih2F = nn.Linear(dim_input+dim_hidden, dim_hidden)
     self.ih2I = nn.Linear(dim_input+dim_hidden, dim_hidden)
@@ -27,6 +28,7 @@ class LSTM(nn.Module):
     # input is in the size of (batch_size, dim_input)
     # dim_hidden is in the size of (batch_size, dim_hidden)
     # memory_cell is in the size of (batch_size, dim_hidden)
+    # print(input.size(), H.size())
     combined = torch.concat((input, H), dim=1)
     F_gate = self.sigmoid(self.ih2F(combined))
     I_gate = self.sigmoid(self.ih2I(combined))
@@ -40,5 +42,5 @@ class LSTM(nn.Module):
 
     return output, (H, C_new)
 
-  def init_hidden(self):
-    return (torch.zeros((1, self.dim_hidden)), torch.zeros((1, self.dim_hidden)))
+  def init_hidden(self, batch_size):
+    return (torch.zeros((batch_size, self.dim_hidden)), torch.zeros((batch_size, self.dim_hidden)))

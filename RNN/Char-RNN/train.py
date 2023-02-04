@@ -89,8 +89,8 @@ def main():
   
   data_loader_train = Dataloader(names=data['train']['names'], tags=data['train']['tags'], all_letters=all_letters, all_categories=all_categories)
   data_loader_val = Dataloader(names=data['val']['names'], tags=data['val']['tags'], all_letters=all_letters, all_categories=all_categories)
-  model = RNN(len(all_letters), 128, len(all_categories))
-  
+  # model = RNN(len(all_letters), 128, len(all_categories))
+  model = LSTM(len(all_letters), 128, len(all_categories))
   trainer = Trainer(
     model=model, 
     training_args=training_args, 

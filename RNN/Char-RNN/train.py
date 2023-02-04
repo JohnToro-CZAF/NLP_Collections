@@ -17,16 +17,16 @@ class Trainer:
     self.data_loader_train = data_loader_train
     self.data_loader_val = data_loader_val
     self.loss = nn.NLLLoss()
-    self.optimizer = torch.optim.Adam(model.parameters(), lr = self.args.learning_rate)
+    self.optimizer = torch.optim.SGD(self.model.parameters(), lr = self.args.learning_rate)
   
   def train_step(self, input, label):
     hidden = self.model.init_hidden()
-    self.model.zero_grad()
+    self.optimizer.zero_grad()
     
     for i in range(input.size()[0]):
       output, hidden = self.model(input[i], hidden)
     # print(output, label)
-    loss = self.loss(output[0], label[0][0]) # Since the dimension of label default is with (len_seq, batch_size, all_categories), here batchsize is 0 and we also only take final output layer -> 0
+    loss = self.loss(output, label) # Since the dimension of label default is with (len_seq, batch_size, all_categories), here batchsize is 0 and we also only take final output layer -> 0
     loss.backward()
     self.optimizer.step()
     
@@ -38,7 +38,7 @@ class Trainer:
       for i in range(input.size()[0]):
         output, hidden = self.model(input[i], hidden)
     
-    loss = self.loss(output[0], label[0][0])
+    loss = self.loss(output, label)
     return output, loss.item()
 
   def eval(self, current_epoch):
@@ -61,6 +61,9 @@ class Trainer:
       total_loss = 0
       correct_ans = 0
       for (input, label), (raw_input, raw_label) in self.data_loader_train:
+        # print(input, label)
+        # print(raw_input, raw_label)
+        # print(self.data_loader_train.all_categories)
         output, loss = self.train_step(input, label)
         total_loss += loss
         # pred_category = torch.argmax(output, dim=1)
@@ -69,10 +72,10 @@ class Trainer:
 
         if category_i == self.data_loader_train.all_categories.index(raw_label):
           correct_ans += 1  
-     
+      print(correct_ans, len(self.data_loader_train))
       print("-"*10 + str(epoch) + "-"*10)    
       print("Current loss on train is: ", total_loss/len(self.data_loader_train))
-      print("Curren acc on val is: ", correct_ans/len(self.data_loader_train))
+      print("Curren acc on train is: ", correct_ans/len(self.data_loader_train))
       self.eval(epoch)
 
 def main():
@@ -80,7 +83,7 @@ def main():
   names, tags, all_letters, all_categories = read_data(data_pth)
   data = split_data(names, tags, random_seed=1)
   training_args = TrainingArgs(
-    learning_rate=0.00001,
+    learning_rate=0.005,
     num_epochs=300
   )
   

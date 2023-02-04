@@ -18,7 +18,7 @@ def find_paths(file_name: str) -> str:
 
 def read_file(file_name: str) -> List:
   with open(file_name) as f:
-    return f.read().strip().split("\n")
+    return f.read().strip().lower().split("\n")
 
 def read_data(data_pth: str):
   all_letters = string.ascii_letters + ".,':;"
@@ -36,8 +36,8 @@ def read_data(data_pth: str):
 
 from sklearn.model_selection import train_test_split
 def split_data(names: List, tags: List, random_seed: int):
-  X_train, X_test, y_train, y_test = train_test_split(names, tags, test_size=0.1,random_state=random_seed)
-  X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.1, random_state=random_seed)
+  X_train, X_test, y_train, y_test = train_test_split(names, tags, test_size=0.1,random_state=random_seed, shuffle=True)
+  X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.1, random_state=random_seed, shuffle=True)
   data = {
     'train': {
       'names': X_train,
@@ -67,8 +67,7 @@ class Dataloader:
     return torch.unsqueeze(tmp_one_hot, -2)
 
   def tag_2_tensor(self, tag: str) -> torch.Tensor:
-    tmp_one_hot = F.one_hot(torch.tensor([self.all_categories.index(tag)]), num_classes=len(self.all_categories))
-    return torch.unsqueeze(tmp_one_hot, 0)
+    return torch.tensor([self.all_categories.index(tag)]) 
 
   def __len__(self):
     return len(self.names)

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
 
 class RNN(nn.Module):
   def __init__(self, dim_input, dim_hidden, dim_output):
@@ -20,4 +21,4 @@ class RNN(nn.Module):
     return output, hidden
 
   def init_hidden(self):
-    return torch.zeros((1, self.dim_hidden))
+    return Variable(torch.zeros((1, self.dim_hidden)))

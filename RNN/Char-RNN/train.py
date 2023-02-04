@@ -25,7 +25,7 @@ class Trainer:
   def eval_step(self, input, label):
     with torch.no_grad():
       hidden = self.model.init_hidden(input.size()[0])
-      for i in range(input.size()[0]):
+      for i in range(input.size()[1]):
         output, hidden = self.model(input[:,i,:], hidden)
     
     loss = self.loss(output, label)
@@ -51,7 +51,7 @@ class Trainer:
     hidden = self.model.init_hidden(batch_size=input.size()[0])
     # print(input)
     # print(input[:, 1, :])
-    for i in range(input.size()[0]):
+    for i in range(input.size()[1]):
       output, hidden = self.model(input[:, i, :], hidden)
     loss = self.loss(output, label) 
     return output, loss
@@ -107,7 +107,7 @@ def main():
   train_loader = DataLoader(data_train, batch_size=1)
   val_loader = DataLoader(data_val, batch_size=1)
 
-  model = RNN(len(all_letters), 256, len(all_categories), batch_size=1)
+  model = RNN(len(all_letters), 128, len(all_categories), batch_size=1)
   # model = LSTM(len(all_letters), 128, len(all_categories), batch_size=1)
   trainer = Trainer(
     model=model, 

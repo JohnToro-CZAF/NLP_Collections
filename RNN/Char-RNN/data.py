@@ -55,19 +55,23 @@ def split_data(names: List, tags: List, random_seed: int):
   return data
 
 from torch.nn import functional as F
-class Dataloader:
-  def __init__(self, names: List, tags: List, all_letters: List, all_categories: List):
+from torch.utils.data import Dataset
+class NameDataset(Dataset):
+  def __init__(self, names: List[str], tags: List[str], all_letters: List[str], all_categories: List[str]):
+    super(NameDataset, self).__init__()
     self.names = names
     self.tags = tags
     self.all_letters = all_letters
     self.all_categories = all_categories
+    self.max_length = max_length
 
   def name_2_tensor(self, name: str) -> torch.Tensor:
-    tmp_one_hot = F.one_hot(torch.tensor([self.all_letters.index(char) for char in name]), num_classes=len(self.all_letters))
-    return torch.unsqueeze(tmp_one_hot, -2)
+    # Padding '.' to name tensor
+    padded_name = [self.all_letters.index(char) for char in name] + (self.max_length - len(name)) * [len(self.all_categories) - 1]
+    return F.one_hot(torch.tensor(padded_name), num_classes=len(self.all_letters))
 
   def tag_2_tensor(self, tag: str) -> torch.Tensor:
-    return torch.tensor([self.all_categories.index(tag)]) 
+    return torch.tensor([self.all_categories.index(tag)]).view(1, ) 
 
   def __len__(self):
     return len(self.names)
@@ -75,4 +79,4 @@ class Dataloader:
   def __getitem__(self, index):
     name = self.names[index]
     tag = self.tags[index]
-    return (self.name_2_tensor(name), self.tag_2_tensor(tag)), (name, tag)
+    return (self.name_2_tensor(name), self.tag_2_tensor(tag))

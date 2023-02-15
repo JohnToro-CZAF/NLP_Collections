@@ -74,7 +74,7 @@ class Trainer:
         train_acc.append(batch_acc/input.size()[0])
 
       train_loss.backward()
-      self.optimizer.step()   
+      self.optimizer.step()
       print("-"*10 + str(epoch) + "-"*10)    
       print("Current loss on train is: ", np.mean(train_loss_arr))
       print("Curren acc on train is: ", np.mean(train_acc))

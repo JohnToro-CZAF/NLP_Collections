@@ -72,7 +72,8 @@ class Trainer:
         train_loss += loss
         train_loss_arr.append(loss.item()/input.size()[0])
         train_acc.append(batch_acc/input.size()[0])
-
+      
+      train_loss /= input.size()[0]
       train_loss.backward()
       self.optimizer.step()
       print("-"*10 + str(epoch) + "-"*10)    

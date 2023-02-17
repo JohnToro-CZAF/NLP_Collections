@@ -13,14 +13,15 @@ class TrainingArgs:
     self.num_epochs = num_epochs
 
 class Trainer:
-  def __init__(self, model=None, training_args=None, train_loader=None, val_loader=None):
+  def __init__(self, model=None, training_args=None, train_loader=None, val_loader=None, device):
     self.args = training_args
     self.model = model
     self.train_loader = train_loader
     self.val_loader = val_loader
     self.loss = nn.NLLLoss()
     self.optimizer = torch.optim.SGD(self.model.parameters(), lr = self.args.learning_rate)
-  
+    self.device = device
+    self.model.to(self.device)
 
   def eval_step(self, input, label):
     with torch.no_grad():
@@ -84,10 +85,12 @@ class Trainer:
 def main():
   data_pth = "./data/names/*.txt"
   names, tags, all_letters, all_categories = read_data(data_pth)
+  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
   data = split_data(names, tags, random_seed=1)
   training_args = TrainingArgs(
     learning_rate=0.0001,
-    num_epochs=300
+    num_epochs=300,
+    device=device
   )
   
   data_train = NameDataset(
@@ -95,7 +98,8 @@ def main():
     tags=data['train']['tags'], 
     all_letters=all_letters, 
     all_categories=all_categories,
-    max_length=20
+    max_length=20,
+    device=device
   )
 
   data_val = NameDataset(
@@ -103,8 +107,10 @@ def main():
     tags=data['val']['tags'], 
     all_letters=all_letters, 
     all_categories=all_categories,
-    max_length=20
+    max_length=20,
+    device=device
   )
+
   train_loader = DataLoader(data_train, batch_size=1)
   val_loader = DataLoader(data_val, batch_size=1)
 
@@ -114,7 +120,8 @@ def main():
     model=model, 
     training_args=training_args, 
     train_loader=train_loader,
-    val_loader=val_loader
+    val_loader=val_loader,
+    device=device
   )
 
   trainer.train()

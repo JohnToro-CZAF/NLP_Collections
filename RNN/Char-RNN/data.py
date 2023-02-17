@@ -57,13 +57,14 @@ def split_data(names: List, tags: List, random_seed: int):
 from torch.nn import functional as F
 from torch.utils.data import Dataset
 class NameDataset(Dataset):
-  def __init__(self, names: List[str], tags: List[str], all_letters: List[str], all_categories: List[str], max_length: int):
+  def __init__(self, names: List[str], tags: List[str], all_letters: List[str], all_categories: List[str], max_length: int, device):
     super(NameDataset, self).__init__()
     self.names = names
     self.tags = tags
     self.all_letters = all_letters
     self.all_categories = all_categories
     self.max_length = max_length
+    self.device=device
 
   def name_2_tensor(self, name: str) -> torch.Tensor:
     # Padding '.' to name tensor
@@ -82,4 +83,4 @@ class NameDataset(Dataset):
   def __getitem__(self, index):
     name = self.names[index]
     tag = self.tags[index]
-    return (self.name_2_tensor(name), self.tag_2_tensor(tag))
+    return (self.name_2_tensor(name).to(self.device), self.tag_2_tensor(tag).to(self.device))

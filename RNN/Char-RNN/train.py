@@ -13,19 +13,18 @@ class TrainingArgs:
     self.num_epochs = num_epochs
 
 class Trainer:
-  def __init__(self, model=None, training_args=None, train_loader=None, val_loader=None, device):
+  def __init__(self, model=None, training_args=None, train_loader=None, val_loader=None):
     self.args = training_args
     self.model = model
     self.train_loader = train_loader
     self.val_loader = val_loader
     self.loss = nn.NLLLoss()
     self.optimizer = torch.optim.SGD(self.model.parameters(), lr = self.args.learning_rate)
-    self.device = device
-    self.model.to(self.device)
 
   def eval_step(self, input, label):
     with torch.no_grad():
       hidden = self.model.init_hidden(input.size()[0])
+      hidden = hidden.to(input.get_device())
       for i in range(input.size()[1]):
         output, hidden = self.model(input[:,i,:], hidden)
     
@@ -50,19 +49,24 @@ class Trainer:
   
   def train_step(self, input, label):
     hidden = self.model.init_hidden(batch_size=input.size()[0])
+    hidden = hidden.to(input.get_device())
     # print(input)
+    self.optimizer.zero_grad()
     # print(input[:, 1, :])
     for i in range(input.size()[1]):
       output, hidden = self.model(input[:, i, :], hidden)
-    loss = self.loss(output, label) 
-    return output, loss
+    loss = self.loss(output, label)
+    loss.backward()
+    self.optimizer.step()
+    return output, loss.item()
 
   def train(self):
+    self.model.train()
     for epoch in range(self.args.num_epochs):
       train_acc = []
       train_loss_arr = []
       train_loss = 0
-      self.optimizer.zero_grad()
+      # self.optimizer.zero_grad()
 
       for input, label in self.train_loader:
         # print(input.size(), label.size())
@@ -70,13 +74,13 @@ class Trainer:
         batch_acc = self.acc_in_batch(output, label)
         # print(output.size(), label.size())
         # print(batch_acc)
-        train_loss += loss
-        train_loss_arr.append(loss.item()/input.size()[0])
+        # train_loss += loss
+        train_loss_arr.append(loss/input.size()[0])
         train_acc.append(batch_acc/input.size()[0])
+        train_loss += loss
       
-      train_loss /= input.size()[0]
-      train_loss.backward()
-      self.optimizer.step()
+      # train_loss.backward()
+      # self.optimizer.step()
       print("-"*10 + str(epoch) + "-"*10)    
       print("Current loss on train is: ", np.mean(train_loss_arr))
       print("Curren acc on train is: ", np.mean(train_acc))
@@ -89,8 +93,7 @@ def main():
   data = split_data(names, tags, random_seed=1)
   training_args = TrainingArgs(
     learning_rate=0.0001,
-    num_epochs=300,
-    device=device
+    num_epochs=300
   )
   
   data_train = NameDataset(
@@ -115,13 +118,13 @@ def main():
   val_loader = DataLoader(data_val, batch_size=1)
 
   model = RNN(len(all_letters), 128, len(all_categories), batch_size=1)
+  model.to(device)
   # model = LSTM(len(all_letters), 128, len(all_categories), batch_size=1)
   trainer = Trainer(
     model=model, 
     training_args=training_args, 
     train_loader=train_loader,
-    val_loader=val_loader,
-    device=device
+    val_loader=val_loader
   )
 
   trainer.train()

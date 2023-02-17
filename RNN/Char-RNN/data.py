@@ -70,9 +70,12 @@ class NameDataset(Dataset):
     # Padding '.' to name tensor
     name_idx = [self.all_letters.index(char) for char in name]
     name_tensor = F.one_hot(torch.tensor(name_idx), num_classes=len(self.all_letters))
+    # print(name_tensor)
     pad_tensor = torch.zeros((self.max_length - len(name), len(self.all_letters)))
     padded_tensor = torch.concat([name_tensor, pad_tensor], dim=0)
-    return padded_tensor
+    # print(padded_tensor[-1])
+    # return padded_tensor
+    return name_tensor
 
   def tag_2_tensor(self, tag: str) -> torch.Tensor:
     return torch.tensor(self.all_categories.index(tag))

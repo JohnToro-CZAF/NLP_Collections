@@ -103,10 +103,9 @@ def main():
   device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
   data = split_data(names, tags, random_seed=1)
   training_args = TrainingArgs(
-    learning_rate=0.001,
+    learning_rate=0.1,
     num_epochs=300
   )
-  
   data_train = NameDataset(
     names=data['train']['names'], 
     tags=data['train']['tags'], 
@@ -115,6 +114,7 @@ def main():
     device=device
   )
 
+  print(len(data_train))
   data_val = NameDataset(
     names=data['val']['names'], 
     tags=data['val']['tags'], 

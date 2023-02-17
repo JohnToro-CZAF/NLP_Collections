@@ -5,8 +5,13 @@ from models.rnn import RNN
 from models.lstm import LSTM
 from data import read_data, split_data, NameDataset
 from torch.utils.data import DataLoader
+from torch.nn.utils.rnn import pad_sequence
 import numpy as np
 
+def pad_collate(batch):
+  (xx, yy) = zip(*batch)
+  xx_pad = pad_sequence(xx, batch_first=True, padding_value=0)
+  return xx_pad, torch.tensor(yy)
 class TrainingArgs:
   def __init__(self, learning_rate: float, num_epochs: int):
     self.learning_rate = learning_rate
@@ -24,7 +29,10 @@ class Trainer:
   def eval_step(self, input, label):
     with torch.no_grad():
       hidden = self.model.init_hidden(input.size()[0])
-      hidden = hidden.to(input.get_device())
+      if not isinstance(hidden, tuple):
+        hidden = hidden.to(input.device)
+      else:
+        hidden = [h.to(input.device) for h in hidden]
       for i in range(input.size()[1]):
         output, hidden = self.model(input[:,i,:], hidden)
     
@@ -49,7 +57,10 @@ class Trainer:
   
   def train_step(self, input, label):
     hidden = self.model.init_hidden(batch_size=input.size()[0])
-    hidden = hidden.to(input.get_device())
+    if not isinstance(hidden, tuple):
+      hidden = hidden.to(input.device)
+    else:
+      hidden = [h.to(input.device) for h in hidden]
     # print(input)
     self.optimizer.zero_grad()
     # print(input[:, 1, :])
@@ -92,7 +103,7 @@ def main():
   device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
   data = split_data(names, tags, random_seed=1)
   training_args = TrainingArgs(
-    learning_rate=0.0001,
+    learning_rate=0.001,
     num_epochs=300
   )
   
@@ -101,7 +112,6 @@ def main():
     tags=data['train']['tags'], 
     all_letters=all_letters, 
     all_categories=all_categories,
-    max_length=20,
     device=device
   )
 
@@ -110,16 +120,15 @@ def main():
     tags=data['val']['tags'], 
     all_letters=all_letters, 
     all_categories=all_categories,
-    max_length=20,
     device=device
   )
 
-  train_loader = DataLoader(data_train, batch_size=1)
-  val_loader = DataLoader(data_val, batch_size=1)
+  train_loader = DataLoader(data_train, batch_size=8, shuffle=True, collate_fn=pad_collate)
+  val_loader = DataLoader(data_val, batch_size=8, shuffle=True, collate_fn=pad_collate)
 
-  model = RNN(len(all_letters), 128, len(all_categories), batch_size=1)
+  # model = RNN(len(all_letters), 32, len(all_categories), batch_size=32)
+  model = LSTM(len(all_letters), 128, len(all_categories), batch_size=8)
   model.to(device)
-  # model = LSTM(len(all_letters), 128, len(all_categories), batch_size=1)
   trainer = Trainer(
     model=model, 
     training_args=training_args, 

@@ -30,10 +30,10 @@ class Trainer:
   def eval_step(self, input, label):
     with torch.no_grad():
       hidden = self.model.init_hidden(input.size()[0])
-      if not isinstance(hidden, tuple):
-        hidden = hidden.to(input.device)
-      else:
+      if isinstance(hidden, tuple) or isinstance(hidden, list):
         hidden = [h.to(input.device) for h in hidden]
+      else:
+        hidden = hidden.to(input.device)
       for i in range(input.size()[1]):
         output, hidden = self.model(input[:,i,:], hidden)
     

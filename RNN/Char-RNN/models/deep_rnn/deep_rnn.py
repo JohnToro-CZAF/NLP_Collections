@@ -6,6 +6,7 @@ from .input_layer import RNNLayer
 
 class DeepRNN(nn.Module):
   def __init__(self, dim_input, dim_hidden, dim_output, num_layers, batch_size):
+    super(DeepRNN, self).__init__()
     self.dim_input = dim_input
     self.dim_hidden = dim_hidden
     self.dim_output = dim_output
@@ -15,7 +16,8 @@ class DeepRNN(nn.Module):
         self.layers.append(RNNLayer(dim_input, dim_hidden))
       else:
         self.layers.append(RNNLayer(dim_hidden, dim_hidden))
-    self.ih2o = nn.Linear(dim_input+dim_hidden, dim_output)
+    self.ih2o = nn.Linear(2*dim_hidden, dim_output)
+    self.softmax = nn.LogSoftmax(dim=1)
   
   def forward(self, input, hidden):
     for i in range(len(self.layers)):

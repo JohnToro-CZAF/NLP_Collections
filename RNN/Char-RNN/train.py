@@ -58,10 +58,10 @@ class Trainer:
   
   def train_step(self, input, label):
     hidden = self.model.init_hidden(batch_size=input.size()[0])
-    if not isinstance(hidden, tuple):
-      hidden = hidden.to(input.device)
-    else:
+    if isinstance(hidden, tuple) or isinstance(hidden, list):
       hidden = [h.to(input.device) for h in hidden]
+    else:
+      hidden = hidden.to(input.device)
     # print(input)
     self.optimizer.zero_grad()
     # print(input[:, 1, :])

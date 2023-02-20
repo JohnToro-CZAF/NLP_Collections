@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models.rnn import RNN
 from models.lstm import LSTM
+from models.deep_rnn.deep_rnn import DeepRNN
 from data import read_data, split_data, NameDataset
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
@@ -127,7 +128,8 @@ def main():
   val_loader = DataLoader(data_val, batch_size=8, shuffle=True, collate_fn=pad_collate)
 
   # model = RNN(len(all_letters), 32, len(all_categories), batch_size=32)
-  model = LSTM(len(all_letters), 128, len(all_categories), batch_size=8)
+  # model = LSTM(len(all_letters), 128, len(all_categories), batch_size=8)
+  model = DeepRNN(len(all_letters), 128, len(all_categories), num_layers=4,batch_size=8)
   model.to(device)
   trainer = Trainer(
     model=model, 

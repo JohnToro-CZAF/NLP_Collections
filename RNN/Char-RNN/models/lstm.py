@@ -2,13 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class LSTM(nn.Module):
-  def __init__(self, dim_input, dim_hidden, dim_output, batch_size):
+class LSTMLayer(nn.Module):
+  def __init__(self, dim_input, dim_hidden, dim_output):
     super().__init__()
     self.dim_input = dim_input
     self.dim_hidden = dim_hidden
     self.dim_output = dim_output
-    self.batch_size = batch_size
 
     self.ih2F = nn.Linear(dim_input+dim_hidden, dim_hidden)
     self.ih2I = nn.Linear(dim_input+dim_hidden, dim_hidden)
@@ -44,3 +43,21 @@ class LSTM(nn.Module):
 
   def init_hidden(self, batch_size):
     return (torch.zeros((batch_size, self.dim_hidden)), torch.zeros((batch_size, self.dim_hidden)))
+
+class LSTM(nn.Module):
+  def __init__(self, dim_input, dim_hidden, dim_output, num_layers):
+    super(DeepRNN, self).__init__()
+    self.dim_input = dim_input
+    self.dim_hidden = dim_hidden
+    self.dim_output = dim_output
+    self.lstm_layer = LSTMLayer(dim_input, dim_hidden, dim_output)
+  
+  def forward(self, input):
+    # input : (batch_size, seq_len, dim_input)
+    outputs = []
+    hidden = self.lstm_layer.init_hidden(input.size()[0])
+    for i in range(input.size()[1]):
+      output, hidden = self.lstm_layer(input[:, i, :], hidden)
+      # output : (batch_size, dim_output)
+      outputs.append(output)
+    return torch.stack(outputs, dim=1)

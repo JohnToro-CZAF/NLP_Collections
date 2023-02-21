@@ -3,7 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models.rnn import RNN
 from models.lstm import LSTM
-from models.deep_rnn.deep_rnn import DeepRNN
+from models.uni_deep_rnn import UniDeepRNN
+from models.bi_deep_rnn import BiDeepRNN
+
 from data import read_data, split_data, NameDataset
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
@@ -29,16 +31,12 @@ class Trainer:
 
   def eval_step(self, input, label):
     with torch.no_grad():
-      hidden = self.model.init_hidden(input.size()[0])
-      if isinstance(hidden, tuple) or isinstance(hidden, list):
-        hidden = [h.to(input.device) for h in hidden]
-      else:
-        hidden = hidden.to(input.device)
-      for i in range(input.size()[1]):
-        output, hidden = self.model(input[:,i,:], hidden)
-    
-    loss = self.loss(output, label)
-    return output, loss
+      outputs = self.model(input)
+      result = outputs[:, input.size()[1]-1, :]
+    # outputs : (batch_size, seq_len, num_classes)
+    # result : (batch_size, num_classes)
+    loss = self.loss(result, label) # only take the last output
+    return result, loss
 
   def acc_in_batch(self, pred, label):
     return torch.sum(torch.argmax(pred, dim=1) == label).item()
@@ -57,20 +55,14 @@ class Trainer:
     print("Current loss on val is: ", np.mean(val_loss))
   
   def train_step(self, input, label):
-    hidden = self.model.init_hidden(batch_size=input.size()[0])
-    if isinstance(hidden, tuple) or isinstance(hidden, list):
-      hidden = [h.to(input.device) for h in hidden]
-    else:
-      hidden = hidden.to(input.device)
-    # print(input)
     self.optimizer.zero_grad()
-    # print(input[:, 1, :])
-    for i in range(input.size()[1]):
-      output, hidden = self.model(input[:, i, :], hidden)
-    loss = self.loss(output, label)
+    outputs = self.model(input)
+    result = outputs[:, input.size()[1]-1, :]
+
+    loss = self.loss(result, label)
     loss.backward()
     self.optimizer.step()
-    return output, loss.item()
+    return result, loss.item()
 
   def train(self):
     self.model.train()
@@ -78,21 +70,14 @@ class Trainer:
       train_acc = []
       train_loss_arr = []
       train_loss = 0
-      # self.optimizer.zero_grad()
 
       for input, label in self.train_loader:
-        # print(input.size(), label.size())
         output, loss = self.train_step(input, label)
         batch_acc = self.acc_in_batch(output, label)
-        # print(output.size(), label.size())
-        # print(batch_acc)
-        # train_loss += loss
         train_loss_arr.append(loss/input.size()[0])
         train_acc.append(batch_acc/input.size()[0])
         train_loss += loss
       
-      # train_loss.backward()
-      # self.optimizer.step()
       print("-"*10 + str(epoch) + "-"*10)    
       print("Current loss on train is: ", np.mean(train_loss_arr))
       print("Curren acc on train is: ", np.mean(train_acc))
@@ -127,9 +112,10 @@ def main():
   train_loader = DataLoader(data_train, batch_size=8, shuffle=True, collate_fn=pad_collate)
   val_loader = DataLoader(data_val, batch_size=8, shuffle=True, collate_fn=pad_collate)
 
-  # model = RNN(len(all_letters), 32, len(all_categories), batch_size=32)
-  # model = LSTM(len(all_letters), 128, len(all_categories), batch_size=8)
-  model = DeepRNN(len(all_letters), 128, len(all_categories), num_layers=4,batch_size=8)
+  model = RNN(len(all_letters), 32, len(all_categories))
+  # model = LSTM(len(all_letters), 128, len(all_categories))
+  # model = UniDeepRNN(len(all_letters), 128, len(all_categories), num_layers=4)
+  # model = BiDeepRNN(len(all_letters), 128, len(all_categories), num_layers=4)
   model.to(device)
   trainer = Trainer(
     model=model, 

@@ -61,9 +61,29 @@ class EngFranRawDataset(Dataset):
           self.vocab[lang][word] = self.vocab_size[lang]
           self.vocab_size[lang] += 1
 
+  def split_train_val_test(self, ratio=0.9):
+    train_size = int(ratio * len(self.corpus))
+    val_size = int((len(self.corpus) - train_size) / 2)
+    test_size = len(self.corpus) - train_size - val_size
+    train, val, test = torch.utils.data.random_split(self.corpus, [train_size, val_size, test_size])
+    
+    TrainDataset = TranslationDataset(train, self.vocab, self.vocab_size)
+    ValDataset = TranslationDataset(val, self.vocab, self.vocab_size)
+    TestDataset = TranslationDataset(test, self.vocab, self.vocab_size)
+    return TrainDataset, ValDataset, TestDataset
+
+class TranslationDataset(Dataset):
+  def __init__(self, dataset, vocab, vocab_size):
+    super(TranslationDataset, self).__init__()
+    self.dataset = dataset
+    self.vocab = vocab
+    self.vocab_size = vocab_size
+  
+  def __len__(self):
+    return len(self.dataset)
+  
   def word_to_tensor(self, word:str, lang='eng') -> torch.Tensor:
-    tmp = torch.tensor([self.vocab[lang][word]])
-    return F.one_hot(tmp, num_classes=self.vocab_size[lang])
+    return F.one_hot(torch.tensor(self.vocab[lang][word]), num_classes=self.vocab_size[lang])
 
   def sent_to_tensor(self, sentence: List[str], lang='eng') -> torch.Tensor:
     # return seq_len, vocab_size
@@ -72,31 +92,29 @@ class EngFranRawDataset(Dataset):
   def pair_to_tensor(self, pair: Dict) -> Tuple[torch.Tensor, torch.Tensor]:
     return [self.sent_to_tensor(pair[lang], lang) for lang in ['eng', 'fra']]
 
-  def split_train_val_test(self, ratio=0.9):
-    train_size = int(ratio * len(self.corpus))
-    val_size = int((len(self.corpus) - train_size) / 2)
-    test_size = len(self.corpus) - train_size - val_size
-    # tqdm for progress bar converting sentence to tensor
-    corpus_tensor = []
-    with tqdm(total=len(self.corpus), desc="Converting sentence to tensor") as pbar:
-      for i, pair in enumerate(self.corpus):
-        try:
-          corpus_tensor.append(self.pair_to_tensor(pair))
-        except:
-          print(pair)
-        pbar.update(1)
-    return torch.utils.data.random_split(corpus_tensor, [train_size, val_size, test_size])
+  def __getitem__(self, idx):
+    return self.pair_to_tensor(self.dataset[idx])
+
+def collate_fn(data):
+  eng, fra = zip(*data)
+  eng = torch.nn.utils.rnn.pad_sequence(eng, batch_first=True, padding_value=0)
+  fra = torch.nn.utils.rnn.pad_sequence(fra, batch_first=True, padding_value=0)
+  return eng, fra
 
 def get_data_loader(num_workers=4, batch_size=4, shuffle=True):
   dataset = EngFranRawDataset(filename='data/eng-fra.txt')
   dataset.read_data()
   dataset.build_vocab()  
   train_data, val_data, test_data = dataset.split_train_val_test()
-
-  return DataLoader(train_data, batch_size=args.batch_size, shuffle=args.shuffle, num_workers=args.num_workers), \
-         DataLoader(val_data, batch_size=args.batch_size, shuffle=args.shuffle, num_workers=args.num_workers), \
-         DataLoader(test_data, batch_size=args.batch_size, shuffle=args.shuffle, num_workers=args.num_workers)
+  
+  return DataLoader(train_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn), \
+         DataLoader(val_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn), \
+         DataLoader(test_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn)
 
 if __name__ == '__main__':
-  get_data_loader()
+  a, b, c = get_data_loader()
+  # testing purpose
+  # for i in a:
+  #   print(i[0].size(), i[1].shape)
+  #   break
 

@@ -39,7 +39,7 @@ class RNN(nn.Module):
     self.dim_output = dim_output
 
     self.rnn_layer = RNNLayer(dim_input, dim_hidden, dim_output)
-    self.softmax = nn.Softmax(dim=-1)
+    self.softmax = nn.LogSoftmax(dim=-1)
   
   def forward(self, input):
     hidden = self.rnn_layer.init_hidden(input.size()[0])

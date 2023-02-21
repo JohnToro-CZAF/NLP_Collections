@@ -24,9 +24,6 @@ class EngFranRawDataset(Dataset):
       'fra': 4
     }
 
-    self.word_2_idx = defaultdict(str)
-    self.idx_2_word = defaultdict(int)
-
   def read_data(self):
     with open(self.filename, 'r', encoding='utf-8') as f:
       for i, _ in enumerate(tqdm(f)):
@@ -58,6 +55,8 @@ class EngFranRawDataset(Dataset):
         if self.freq[lang][word] < 2:
           self.vocab[lang][word] = 3 # <UNK>
         else:
+          if word in self.vocab[lang]:
+            continue
           self.vocab[lang][word] = self.vocab_size[lang]
           self.vocab_size[lang] += 1
 
@@ -72,6 +71,8 @@ class EngFranRawDataset(Dataset):
     TestDataset = TranslationDataset(test, self.vocab, self.vocab_size)
     return TrainDataset, ValDataset, TestDataset
 
+  def get_tokenizer(self):
+    return Tokenizer(self.vocab, self.vocab_size)
 class TranslationDataset(Dataset):
   def __init__(self, dataset, vocab, vocab_size):
     super(TranslationDataset, self).__init__()
@@ -82,18 +83,38 @@ class TranslationDataset(Dataset):
   def __len__(self):
     return len(self.dataset)
   
-  def word_to_tensor(self, word:str, lang='eng') -> torch.Tensor:
-    return F.one_hot(torch.tensor(self.vocab[lang][word]), num_classes=self.vocab_size[lang])
+  # def word_to_tensor(self, word:str, lang='eng') -> torch.Tensor:
+  #   return F.one_hot(torch.tensor(self.vocab[lang][word]), num_classes=self.vocab_size[lang])
 
   def sent_to_tensor(self, sentence: List[str], lang='eng') -> torch.Tensor:
     # return seq_len, vocab_size
-    return torch.stack([self.word_to_tensor(word, lang) for word in sentence], dim=0)
+    return torch.tensor([self.vocab[lang][word] for word in sentence])
 
   def pair_to_tensor(self, pair: Dict) -> Tuple[torch.Tensor, torch.Tensor]:
     return [self.sent_to_tensor(pair[lang], lang) for lang in ['eng', 'fra']]
 
   def __getitem__(self, idx):
     return self.pair_to_tensor(self.dataset[idx])
+
+class Tokenizer():
+  def __init__(self, vocab, vocab_size):
+    self.token_2_id = vocab
+    self.id_2_token = {
+      'eng': defaultdict(),
+      'fra': defaultdict()
+    }
+    self.vocab_size = vocab_size
+    self.id_2_token['eng'] = {v: k for k, v in self.token_2_id['eng'].items()}
+    self.id_2_token['fra'] = {v: k for k, v in self.token_2_id['fra'].items()}
+    # print(self.token_2_id['fra']['<BOS>'])
+  
+  def tokens_2_ids(self, sentence: List[str], lang='eng') -> torch.Tensor:
+    # return seq_len, vocab_size
+    return torch.tensor([self.token_2_id[lang][word] for word in sentence])
+  
+  def ids_2_tokens(self, tensor: torch.Tensor, lang='eng') -> List[str]:
+    tensor = tensor.detach().cpu().numpy()
+    return [self.id_2_token[lang][id] for id in tensor]
 
 def collate_fn(data):
   eng, fra = zip(*data)
@@ -104,17 +125,21 @@ def collate_fn(data):
 def get_data_loader(num_workers=4, batch_size=4, shuffle=True):
   dataset = EngFranRawDataset(filename='data/eng-fra.txt')
   dataset.read_data()
-  dataset.build_vocab()  
+  dataset.build_vocab()
   train_data, val_data, test_data = dataset.split_train_val_test()
-  
+  tokenizer = dataset.get_tokenizer()
+
   return DataLoader(train_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn), \
          DataLoader(val_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn), \
-         DataLoader(test_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn)
+         DataLoader(test_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn), \
+         tokenizer
 
 if __name__ == '__main__':
-  a, b, c = get_data_loader()
+  a, b, c, t = get_data_loader()
+  print(t.tokens_2_ids(['hello', 'world'], 'eng'))
+  print(t.ids_2_tokens(torch.tensor([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), 'fra'))
+
   # testing purpose
   # for i in a:
   #   print(i[0].size(), i[1].shape)
   #   break
-

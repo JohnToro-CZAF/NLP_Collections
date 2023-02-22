@@ -62,9 +62,9 @@ class LSTMLayer(nn.Module):
     # outputs: seq_len, batch_size, hidden_dim
     return torch.stack(outputs, dim=0), (H, C)
 
-class LSTM(nn.Module):
+class DeepLSTM(nn.Module):
   def __init__(self, input_dim, hidden_dim, num_layers, dropout=0.5):
-    super(LSTM, self).__init__()
+    super(DeepLSTM, self).__init__()
     self.input_dim = input_dim
     self.hidden_dim = hidden_dim
     self.num_layers = num_layers
@@ -91,6 +91,7 @@ class LSTM(nn.Module):
       last_hiddens.append(H), last_cells.append(C)
     
     # last_hiddens: num_layers, batch_size, hidden_dim
+    # outputs: batch_size, seq_len, hidden_dim
     return outputs, (torch.stack(last_hiddens), torch.stack(last_cells))
 
 def init_weight(module: nn.Module):
@@ -98,7 +99,7 @@ def init_weight(module: nn.Module):
     nn.init.xavier_uniform_(module.weight)
 
 if __name__ == "__main__":
-  lstm = LSTM(input_dim=10, hidden_dim=20, num_layers=4)
+  lstm = DeepLSTM(input_dim=10, hidden_dim=20, num_layers=4)
   lstm.init_weight(init_weight)
   X = torch.rand((3, 5, 10))
   outputs, (last_hiddens, last_cells) = lstm(X)

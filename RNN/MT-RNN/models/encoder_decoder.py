@@ -1,15 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .lstm import DeepLSTM
+from deep_lstm import DeepLSTM
 
-def init_weight(moudle: nn.Module):
+def init_weight(module: nn.Module):
   if type(module) == nn.Linear:
     nn.init.xavier_uniform_(module.weight)
-  else:
-    for param in module._flat_weights_names:
-      if 'weight' in param:
-        nn.init.xavier_uniform_(module._parameters[param])
 
 class Encoder(nn.Module):
   def __init__(self, vocab_size, embedding_size, hidden_size, num_layers, dropout):
@@ -31,7 +27,7 @@ class Encoder(nn.Module):
     # output: batch_size, seq_len, hidden_size (last layer hiddens)
     # hidden: num_layers, batch_size, hidden_size (only takes the last hidden state for each layer)
     # cell: num_layers, batch_size, hidden_size
-    outputs, (hidden, cell) = self.lstm(self.embedding(X))
+    outputs, (hidden, cell) = self.lstm(self.embedding(X.transpose(0, 1)))
     return outputs, (hidden, cell)
 
 class Decoder(nn.Module):
@@ -54,7 +50,7 @@ class Decoder(nn.Module):
     embs = self.embedding(y)
     # embs: batch_size, seq_len, embedding_size
     # context: seq_len, batch_size, hidden_size
-    outputs, (hidden, cell) = self.lstm(torch.cat((embs.t(), context), dim=-1))
+    outputs, (hidden, cell) = self.lstm(torch.cat((embs.transpose(0, 1), context), dim=-1))
     # outputs: seq_len, batch_size, hidden_size
     outputs = self.softmax(self.fc(outputs))
     # outputs: seq_len, batch_size, vocab_size
@@ -62,7 +58,7 @@ class Decoder(nn.Module):
     # outputs: batch_size, seq_len, vocab_size
     return outputs
 
-class EncoderDecoder(nn.Moudle):
+class EncoderDecoder(nn.Module):
   def __init__(self, encoder, decoder):
     super(EncoderDecoder, self).__init__()
     self.encoder = encoder
@@ -80,3 +76,13 @@ class EncoderDecoder(nn.Moudle):
     # y: batch_size, seq_len, vocab_size
     outputs = self.decoder(y, context)
     return outputs # (batch_size, seq_len, vocab_size)
+
+if __name__ == "__main__":
+  encoder = Encoder(vocab_size=5, embedding_size=8, hidden_size=10, num_layers=2, dropout=0.5)
+  decoder = Decoder(vocab_size=6, embedding_size=8, hidden_size=10, num_layers=2, dropout=0.5)
+  model = EncoderDecoder(encoder, decoder)
+  X = torch.randint(0, 4, (4, 8))
+  y = torch.randint(0, 5, (4, 20))
+  # outputs: batch_size, seq_len, vocab_size
+  outputs = model(X, y)
+  print(outputs.size())

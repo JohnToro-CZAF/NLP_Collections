@@ -55,6 +55,7 @@ class Trainer(object):
       running_loss += loss.item()
       loss.backward()
       self.optimizer.step()
+      print('Epoch: {}, Batch: {}, Loss: {:.4f}'.format(epoch, i, loss.item()))
     print('Epoch: {}, Loss: {:.4f}'.format(epoch, running_loss / len(self.train_data)))
     y_loss['train'].append(running_loss / len(self.train_data))
   

@@ -21,7 +21,7 @@ class Encoder(nn.Module):
     self.lstm = DeepLSTM(input_dim=embedding_size, hidden_dim=hidden_size, num_layers=num_layers, dropout=dropout)
 
   def _init_weight(self):
-    self.lstm.init_weight()
+    self.lstm.init_weight(init_weight)
     self.apply(init_weight)
 
   def forward(self, X):
@@ -46,7 +46,7 @@ class Decoder(nn.Module):
     self.softmax = nn.LogSoftmax(dim=-1)
   
   def _init_weight(self):
-    self.lstm.init_weight()
+    self.lstm.init_weight(init_weight)
     self.apply(init_weight)
   
   def forward(self, y, context):

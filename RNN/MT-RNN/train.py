@@ -2,25 +2,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torch.utils.tensorboard import SummaryWriter
 from data import get_data_loader
 from models.encoder_decoder import Encoder, Decoder, EncoderDecoder
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
+from tqdm import tqdm
+from datetime import datetime
 
-fig = plt.figure()
-ax0 = fig.add_subplot(121, title="loss")
-x_epoch = []
-y_loss = {'train': [], 'val': [], 'test': []}
-
-def draw_curve(current_epoch):
-    x_epoch.append(current_epoch)
-    ax0.plot(x_epoch, y_loss['train'], 'bo-', label='train')
-    ax0.plot(x_epoch, y_loss['val'], 'ro-', label='val')
-    ax0.plot(x_epoch, y_loss['test'], 'go-', label='test')
-    if current_epoch == 0:
-        ax0.legend()
-    fig.savefig(os.path.join('./lossGraphs', 'train.jpg'))
+tb = SummaryWriter('./runs')
 
 class TrainingArgs(object):
   def __init__(self, epochs, lr, weight_decay):
@@ -43,27 +34,10 @@ class Trainer(object):
   def train_epoch(self, epoch):
     self.model.train()
     running_loss = 0.0
-    for i, (X, y, y_hat) in enumerate(self.train_data):
-      X = X.to(self.device)
-      y = y.to(self.device)
-      y_hat = y_hat.to(self.device)
-      self.optimizer.zero_grad()
-      outputs = self.model(X, y)
-      mask = (y != self.tokenizer.pad_token_id).float()
-      loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
-      loss = (loss * torch.flatten(mask)).sum() / mask.sum()
-      running_loss += loss.item()
-      loss.backward()
-      self.optimizer.step()
-      print('Epoch: {}, Batch: {}, Loss: {:.4f}'.format(epoch, i, loss.item()))
-    print('Epoch: {}, Loss: {:.4f}'.format(epoch, running_loss / len(self.train_data)))
-    y_loss['train'].append(running_loss / len(self.train_data))
-  
-  def val_epoch(self, epoch):
-    self.model.eval()
-    with torch.no_grad():
-      running_loss = 0.0
-      for i, (X, y, y_hat) in enumerate(self.val_data):
+    with tqdm(self.train_data, unit="batch") as tepoch:
+      for i, (X, y, y_hat) in enumerate(tepoch):
+        tepoch.set_description(f"Epoch {epoch}")
+        
         X = X.to(self.device)
         y = y.to(self.device)
         y_hat = y_hat.to(self.device)
@@ -73,45 +47,79 @@ class Trainer(object):
         loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
         loss = (loss * torch.flatten(mask)).sum() / mask.sum()
         running_loss += loss.item()
-      y_loss['val'].append(running_loss / len(self.val_data))
+        loss.backward()
+        self.optimizer.step()
+        
+        tepoch.set_postfix(loss=loss.item()/X.size()[0])
+        if i % 100 == 99:
+          tb.add_scalar("Train Loss", running_loss/100, epoch * len(self.train_data) + i)
+          running_loss = 0.0
+    
+  def val_epoch(self, epoch):
+    self.model.eval()
+    with torch.no_grad():
+      running_loss = 0.0
+      with tqdm(self.val_data, unit="batch") as tepoch:
+        for i, (X, y, y_hat) in enumerate(tepoch):
+          tepoch.set_description(f"Epoch {epoch}")
+          
+          X = X.to(self.device)
+          y = y.to(self.device)
+          y_hat = y_hat.to(self.device)
+          self.optimizer.zero_grad()
+          outputs = self.model(X, y)
+          mask = (y != self.tokenizer.pad_token_id).float()
+          loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
+          loss = (loss * torch.flatten(mask)).sum() / mask.sum()
+          running_loss += loss.item()
+          
+          tepoch.set_postfix(loss=loss.item()/X.size()[0])
+      
+      tb.add_scalar("Val Loss", running_loss/len(self.val_data), epoch)
+      running_loss = 0.0
   
   def test(self):
     self.model.eval()
     with torch.no_grad():
       running_loss = 0.0
-      for i, (X, y, h_hat) in enumerate(self.test_data):
-        X = X.to(self.device)
-        y = y.to(self.device)
-        y_hat = y_hat.to(self.device)
-        outputs = self.model(X, y)
-        mask = (y != self.tokenizer.pad_token_id).float()
-        loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
-        loss = (loss * torch.flatten(mask)).sum() / mask.sum()
-        running_loss += loss.item()
-      y_loss['test'].append(running_loss / len(self.test_data))
+      with tqdm(self.test_data, unit="batch") as tepoch:
+        for i, (X, y, y_hat) in enumerate(self.test_data):
+          tepoch.set_description(f"Epoch {tepoch}")
+          
+          X = X.to(self.device)
+          y = y.to(self.device)
+          y_hat = y_hat.to(self.device)
+          outputs = self.model(X, y)
+          mask = (y != self.tokenizer.pad_token_id).float()
+          loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
+          loss = (loss * torch.flatten(mask)).sum() / mask.sum()
+          running_loss += loss.item()
+      
+        print("Overall test set loss is: {}".format(running_loss))
   
   def train(self):
     for epoch in range(args.epochs):
       self.train_epoch(epoch)
       self.val_epoch(epoch)
-      draw_curve(epoch)
     self.test()
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--data_path', type=str, default='data/eng-fra.txt')
-  parser.add_argument('--num_workers', type=int, default=4)
-  parser.add_argument('--batch_size', type=int, default=4)
-  parser.add_argument('--epochs', type=int, default=10)
-  parser.add_argument('--lr', type=float, default=0.001)
+  parser.add_argument('--num_workers', type=int, default=16)
+  parser.add_argument('--batch_size', type=int, default=512)
+  parser.add_argument('--epochs', type=int, default=30)
+  parser.add_argument('--lr', type=float, default=0.005)
   parser.add_argument('--weight_decay', type=float, default=0.0001)
-  parser.add_argument('--dropout', type=float, default=0.5)
+  parser.add_argument('--dropout', type=float, default=0.2)
 
-  parser.add_argument('--save_path', type=str, default='model.pt')
-  parser.add_argument('--load_path', type=str, default='model.pt')
+  parser.add_argument('--save_path', type=str, default='.saved_models/')
+  parser.add_argument('--load_path', type=str, default=None)
   args = parser.parse_args()
-  
-  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+  device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+  print("Training on device: {}".format(device))
+  print("Getting data loaders from dataset")
   train, val, test, tokenizer = \
     get_data_loader(batch_size=args.batch_size, 
                     num_workers=args.num_workers, 
@@ -127,9 +135,13 @@ if __name__ == "__main__":
                     hidden_size=256, \
                     num_layers=2,
                     dropout=args.dropout)
-
+  
   training_args = TrainingArgs(epochs=args.epochs, lr=args.lr, weight_decay=args.weight_decay) 
   model = EncoderDecoder(encoder, decoder).to(device)
+  
+  if args.load_path is not None:
+    checkpoint = torch.load(args.load_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
   trainer = Trainer(model=model, 
                    train=train, 
                    val=val, 
@@ -138,3 +150,6 @@ if __name__ == "__main__":
                    device=device,
                    args=training_args)
   trainer.train()
+  torch.save({
+    'model_state_dict': model.state_dict()
+  }, args.save_path + datetime.now().strftime("%D:%H:%M:%S"))

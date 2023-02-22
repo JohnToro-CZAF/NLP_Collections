@@ -81,12 +81,16 @@ class DeepLSTM(nn.Module):
     # X: seq_len, batch_size, input_dim
     last_hiddens, last_cells = [], []
     H, C = self.input_layer.init_hidden(X.size()[1])
+    H = H.to(X.device)
+    C = C.to(X.device)
     last_hiddens.append(H), last_cells.append(C)
     outputs, (hidden, cell) = self.input_layer(X, (H, C))
     # outputs are the hiddens in the layer
     # outputs: seq_len, batch_size, hidden_dim
     for layer in self.layers:
       H, C = layer.init_hidden(X.size()[1])
+      H = H.to(X.device)
+      C = C.to(X.device)
       outputs, (H, C) = layer(outputs, (H, C))
       last_hiddens.append(H), last_cells.append(C)
     

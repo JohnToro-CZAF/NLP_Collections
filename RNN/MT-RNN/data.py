@@ -107,6 +107,7 @@ class Tokenizer():
     self.vocab_size = vocab_size
     self.id_2_token['eng'] = {v: k for k, v in self.token_2_id['eng'].items()}
     self.id_2_token['fra'] = {v: k for k, v in self.token_2_id['fra'].items()}
+    self.pad_token_id = self.token_2_id['eng']['<PAD>']
     # print(self.token_2_id['fra']['<BOS>'])
   
   def tokens_2_ids(self, sentence: List[str], lang='eng') -> torch.Tensor:
@@ -124,8 +125,8 @@ def collate_fn(data):
   fra_label = torch.nn.utils.rnn.pad_sequence(fra_label, batch_first=True, padding_value=0)
   return eng, fra, fra_label
 
-def get_data_loader(num_workers=4, batch_size=4, shuffle=True):
-  dataset = EngFranRawDataset(filename='data/eng-fra.txt')
+def get_data_loader(filename, num_workers=4, batch_size=4, shuffle=True):
+  dataset = EngFranRawDataset(filename)
   dataset.read_data()
   dataset.build_vocab()
   train_data, val_data, test_data = dataset.split_train_val_test()

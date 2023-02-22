@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from deep_lstm import DeepLSTM
+from .deep_lstm import DeepLSTM
 
 def init_weight(module: nn.Module):
   if type(module) == nn.Linear:

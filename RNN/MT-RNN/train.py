@@ -55,6 +55,8 @@ class Trainer(object):
       running_loss += loss.item()
       loss.backward()
       self.optimizer.step()
+      if i % 10000 == 0:
+        print('Epoch: {}, Iteration: {}, Loss: {:.4f}'.format(epoch, i, loss.item()))
     print('Epoch: {}, Loss: {:.4f}'.format(epoch, running_loss / len(self.train_data)))
     y_loss['train'].append(running_loss / len(self.train_data))
   
@@ -109,8 +111,8 @@ if __name__ == "__main__":
   parser.add_argument('--load_path', type=str, default='model.pt')
   args = parser.parse_args()
   
-  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+  device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+  print(device)
   train, val, test, tokenizer = \
     get_data_loader(batch_size=args.batch_size, 
                     num_workers=args.num_workers, 
@@ -126,7 +128,7 @@ if __name__ == "__main__":
                     hidden_size=256, \
                     num_layers=2,
                     dropout=args.dropout)
-
+  
   training_args = TrainingArgs(epochs=args.epochs, lr=args.lr, weight_decay=args.weight_decay) 
   model = EncoderDecoder(encoder, decoder).to(device)
   trainer = Trainer(model=model, 

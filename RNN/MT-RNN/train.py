@@ -7,6 +7,9 @@ from models.encoder_decoder import Encoder, Decoder, EncoderDecoder
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
+from tqdm import tqdm
+from time import sleep
+import os
 
 fig = plt.figure()
 ax0 = fig.add_subplot(121, title="loss")
@@ -43,28 +46,9 @@ class Trainer(object):
   def train_epoch(self, epoch):
     self.model.train()
     running_loss = 0.0
-    for i, (X, y, y_hat) in enumerate(self.train_data):
-      X = X.to(self.device)
-      y = y.to(self.device)
-      y_hat = y_hat.to(self.device)
-      self.optimizer.zero_grad()
-      outputs = self.model(X, y)
-      mask = (y != self.tokenizer.pad_token_id).float()
-      loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
-      loss = (loss * torch.flatten(mask)).sum() / mask.sum()
-      running_loss += loss.item()
-      loss.backward()
-      self.optimizer.step()
-      if i % 10000 == 0:
-        print('Epoch: {}, Iteration: {}, Loss: {:.4f}'.format(epoch, i, loss.item()))
-    print('Epoch: {}, Loss: {:.4f}'.format(epoch, running_loss / len(self.train_data)))
-    y_loss['train'].append(running_loss / len(self.train_data))
-  
-  def val_epoch(self, epoch):
-    self.model.eval()
-    with torch.no_grad():
-      running_loss = 0.0
-      for i, (X, y, y_hat) in enumerate(self.val_data):
+    with tqdm(self.train_data, unit="batch") as tepoch:
+      for i, (X, y, y_hat) in enumerate(tepoch):
+        tepoch.set_description(f"Epoch {epoch}")
         X = X.to(self.device)
         y = y.to(self.device)
         y_hat = y_hat.to(self.device)
@@ -74,21 +58,47 @@ class Trainer(object):
         loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
         loss = (loss * torch.flatten(mask)).sum() / mask.sum()
         running_loss += loss.item()
+        loss.backward()
+        self.optimizer.step()
+        tepoch.set_postfix(loss=loss.item())
+    # y_loss['train'].append(running_loss / len(self.train_data))
+  
+  def val_epoch(self, epoch):
+    self.model.eval()
+    with torch.no_grad():
+      running_loss = 0.0
+      with tqdm(self.val_data, unit="batch") as tepoch:
+        for i, (X, y, y_hat) in enumerate(tepoch):
+          tepoch.set_description(f"Epoch {epoch}")
+          X = X.to(self.device)
+          y = y.to(self.device)
+          y_hat = y_hat.to(self.device)
+          self.optimizer.zero_grad()
+          outputs = self.model(X, y)
+          mask = (y != self.tokenizer.pad_token_id).float()
+          loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
+          loss = (loss * torch.flatten(mask)).sum() / mask.sum()
+          running_loss += loss.item()
+          tepoch.set_postfix(loss=loss.item())
+          sleep(0.1)
       y_loss['val'].append(running_loss / len(self.val_data))
   
   def test(self):
     self.model.eval()
     with torch.no_grad():
       running_loss = 0.0
-      for i, (X, y, h_hat) in enumerate(self.test_data):
-        X = X.to(self.device)
-        y = y.to(self.device)
-        y_hat = y_hat.to(self.device)
-        outputs = self.model(X, y)
-        mask = (y != self.tokenizer.pad_token_id).float()
-        loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
-        loss = (loss * torch.flatten(mask)).sum() / mask.sum()
-        running_loss += loss.item()
+      with tqdm(self.test_data, unit="batch") as tepoch:
+        for i, (X, y, h_hat) in enumerate(self.test_data):
+          tepoch.set_description(f"Epoch {epoch}")
+          X = X.to(self.device)
+          y = y.to(self.device)
+          y_hat = y_hat.to(self.device)
+          outputs = self.model(X, y)
+          mask = (y != self.tokenizer.pad_token_id).float()
+          loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
+          loss = (loss * torch.flatten(mask)).sum() / mask.sum()
+          running_loss += loss.item()
+          tepoch.set_posfix(loss=loss.item())
       y_loss['test'].append(running_loss / len(self.test_data))
   
   def train(self):
@@ -112,7 +122,8 @@ if __name__ == "__main__":
   args = parser.parse_args()
   
   device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-  print(device)
+  print("Training on device: {}".format(device))
+  print("Getting data loaders from dataset")
   train, val, test, tokenizer = \
     get_data_loader(batch_size=args.batch_size, 
                     num_workers=args.num_workers, 

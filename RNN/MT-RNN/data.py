@@ -132,9 +132,9 @@ def get_data_loader(filename, num_workers=4, batch_size=4, shuffle=True):
   train_data, val_data, test_data = dataset.split_train_val_test()
   tokenizer = dataset.get_tokenizer()
 
-  return DataLoader(train_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn), \
-         DataLoader(val_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn), \
-         DataLoader(test_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn), \
+  return DataLoader(train_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn, pin_memory=True), \
+         DataLoader(val_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn, pin_memory=True), \
+         DataLoader(test_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn, pin_memory=True), \
          tokenizer
 
 if __name__ == '__main__':

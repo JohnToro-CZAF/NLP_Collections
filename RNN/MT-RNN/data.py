@@ -27,7 +27,7 @@ class EngFranRawDataset(Dataset):
   def read_data(self):
     with open(self.filename, 'r', encoding='utf-8') as f:
       for i, _ in enumerate(tqdm(f)):
-        PairEngFra = defaultdict(str)
+        EngFra = defaultdict(str)
         pairs = _.split("\t")[:-1]
         for item, lang in zip(pairs, ['eng', 'fra']):
           item = item.replace('\u202f', ' ').replace('\xa0', ' ').replace('\u2009', ' ').lower().strip()
@@ -35,11 +35,12 @@ class EngFranRawDataset(Dataset):
           sentence = [char if idx > 0 and not check(char, item[idx-1]) else (" " + char) for idx, char in enumerate(item)]
           sentence = [word for word in "".join(sentence).split() if word]
           if lang == "fra":
-            sentence = ["<BOS>"] + sentence 
-          sentence = sentence + ["<EOS>"]
-          PairEngFra[lang] = sentence
-        
-        self.corpus.append(PairEngFra)
+            sentence = ["<BOS>"] + sentence
+          else:
+            sentence = sentence + ["<EOS>"]
+          EngFra[lang] = sentence
+        EngFra['fra_label'] = EngFra['fra'][1:] + ["<EOS>"]
+        self.corpus.append(EngFra)
 
   def build_vocab(self):
     self.vocab_eng = {"<PAD>": 0, "<BOS>": 1, "<EOS>": 2, "<UNK>": 3}
@@ -91,7 +92,7 @@ class TranslationDataset(Dataset):
     return torch.tensor([self.vocab[lang][word] for word in sentence])
 
   def pair_to_tensor(self, pair: Dict) -> Tuple[torch.Tensor, torch.Tensor]:
-    return [self.sent_to_tensor(pair[lang], lang) for lang in ['eng', 'fra']]
+    return [self.sent_to_tensor(pair[lang], lang) for lang in ['eng', 'fra']] + [self.sent_to_tensor(pair['fra_label'], 'fra')]
 
   def __getitem__(self, idx):
     return self.pair_to_tensor(self.dataset[idx])
@@ -117,10 +118,11 @@ class Tokenizer():
     return [self.id_2_token[lang][id] for id in tensor]
 
 def collate_fn(data):
-  eng, fra = zip(*data)
+  eng, fra, fra_label = zip(*data)
   eng = torch.nn.utils.rnn.pad_sequence(eng, batch_first=True, padding_value=0)
   fra = torch.nn.utils.rnn.pad_sequence(fra, batch_first=True, padding_value=0)
-  return eng, fra
+  fra_label = torch.nn.utils.rnn.pad_sequence(fra_label, batch_first=True, padding_value=0)
+  return eng, fra, fra_label
 
 def get_data_loader(num_workers=4, batch_size=4, shuffle=True):
   dataset = EngFranRawDataset(filename='data/eng-fra.txt')

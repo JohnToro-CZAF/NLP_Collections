@@ -97,10 +97,8 @@ class EncoderDecoder(nn.Module):
     for _ in range(num_steps):
       distribution, H_C = self.decoder(outputs[:,-1].unsqueeze(1), context, H_C) # Take the last step of output
       # distribution: batch_size, 1, vocab_size
-      predicted_token = torch.argmax(distribution, dim=-1)
-      # predicted_token: batch_size, 1
-      outputs = torch.cat((outputs, predicted_token), dim=1)
-    # outputs: batch_size, seq_len
+      outputs = torch.cat((outputs, distribution), dim=1)
+    # outputs: batch_size, seq_len, vocab_size
     return outputs
         
 

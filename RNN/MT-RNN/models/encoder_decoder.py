@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from deep_lstm import DeepLSTM
+from .deep_lstm import DeepLSTM
 
 def init_weight(module: nn.Module):
   if type(module) == nn.Linear:
@@ -134,7 +134,8 @@ class EncoderDecoder(nn.Module):
       pred_tokens = torch.cat((pred_tokens, pred_token), dim=-1)
       outputs.append(distribution.squeeze(1)) # -> batch_size, vocab_soze
     # outputs: seq_len, batch_size, vocab_size
-    return torch.stack(outputs, dim=0).transpose(0, 1)
+    # pred_tokens: batch_size, seq_len
+    return torch.stack(outputs, dim=0).transpose(0, 1), pred_tokens
 
 if __name__ == "__main__":
   encoder = Encoder(vocab_size=5, embedding_size=8, hidden_size=10, num_layers=2, dropout=0.5)
@@ -144,5 +145,5 @@ if __name__ == "__main__":
   y = torch.randint(0, 5, (4, 20))
   # outputs: batch_size, seq_len, vocab_size
   outputs = model(X, y)
-  model.predict_step(X, y, max_length=10)
+  model.predict_step(X, y, mode='test', max_length=10)
   print(outputs.size())

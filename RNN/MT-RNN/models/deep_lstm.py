@@ -23,6 +23,8 @@ class LSTMCell(nn.Module):
   
   def forward(self, input, H_C):
     H, C = H_C
+    H = H.to(input.device)
+    C = C.to(input.device)
     combined = torch.concat((input, H), dim=1)
     F_gate = self.dropout(self.sigmoid(self.ih2F(combined)))
     I_gate = self.dropout(self.sigmoid(self.ih2I(combined)))

@@ -123,7 +123,7 @@ class Trainer(object):
     for epoch in range(args.epochs):
       self.train_epoch(epoch)
       self.val_epoch(epoch)
-      if epoch % 10 == 9:
+      if epoch % 5 == 4:
         self.test()
 
 if __name__ == "__main__":
@@ -131,7 +131,7 @@ if __name__ == "__main__":
   parser.add_argument('--data_path', type=str, default='data/eng-fra.txt')
   parser.add_argument('--num_workers', type=int, default=16)
   parser.add_argument('--batch_size', type=int, default=256)
-  parser.add_argument('--epochs', type=int, default=40)
+  parser.add_argument('--epochs', type=int, default=20)
   parser.add_argument('--lr', type=float, default=0.005)
   parser.add_argument('--weight_decay', type=float, default=0.0001)
   parser.add_argument('--dropout', type=float, default=0.2)
@@ -152,7 +152,7 @@ if __name__ == "__main__":
   encoder = Encoder(vocab_size=train.dataset.vocab_size['eng'],
                     embedding_size=256,
                     hidden_size=256,
-                    num_layers=2,
+                    num_layers=4,
                     dropout=args.dropout)
   decoder = Decoder(vocab_size=train.dataset.vocab_size['fra'],
                     embedding_size=256,
@@ -164,7 +164,7 @@ if __name__ == "__main__":
     epochs=args.epochs,
     lr=args.lr,
     weight_decay=args.weight_decay,
-    teaching_forcing=args.teaching_forcing) 
+    teaching_forcing=args.teaching_forcing)
   
   model = EncoderDecoder(encoder, decoder).to(device)
   

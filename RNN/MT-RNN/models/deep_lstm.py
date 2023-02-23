@@ -33,7 +33,7 @@ class LSTMCell(nn.Module):
 
     C_new = C * F_gate + I_gate * C_gate
     H = self.tanh(C_new) * O_gate
-    return H, (H, C_new)
+    return H, [H, C_new]
 
 class LSTMLayer(nn.Module):
   def __init__(self, input_dim, hidden_dim, dropout):
@@ -63,7 +63,7 @@ class LSTMLayer(nn.Module):
       output, (H, C) = self.lstm(input, (H, C))
       outputs.append(output)
     # outputs: seq_len, batch_size, hidden_dim
-    return torch.stack(outputs, dim=0), (H, C)
+    return torch.stack(outputs, dim=0), [H, C]
 
 class DeepLSTM(nn.Module):
   def __init__(self, input_dim, hidden_dim, num_layers, dropout=0.5):
@@ -87,8 +87,7 @@ class DeepLSTM(nn.Module):
     for layer in self.layers:
       h, c = layer.init_hidden(batch_size)
       H.append(h), C.append(c)
-    
-    return (torch.stack(H), torch.stack(C))
+    return [torch.stack(H), torch.stack(C)]
     
   def forward(self, X, state):
     # X: seq_len, batch_size, input_dim,
@@ -107,7 +106,7 @@ class DeepLSTM(nn.Module):
     
     # last_hiddens: num_layers, batch_size, hidden_dim
     # outputs: seq_len, batch_size, hidden_dim
-    return outputs, (torch.stack(last_hiddens), torch.stack(last_cells))
+    return outputs, [torch.stack(last_hiddens), torch.stack(last_cells)]
   
 if __name__ == "__main__":
   lstm = DeepLSTM(input_dim=10, hidden_dim=20, num_layers=4)

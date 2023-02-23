@@ -18,7 +18,7 @@ def bleu_eval(label_tokens: Union[str, List], pred_tokens: Union[str, List], k:i
   if isinstance(pred_tokens, str):
     pred_tokens = pred_tokens.split()
   
-  while label_tokens[-1] == ['<PAD>', '<EOS>']:
+  while label_tokens[-1] in ['<PAD>', '<EOS>']:
     label_tokens.pop()
   
   # pred_tokens normally like this: A B C D '.' <EOS> '.' <EOS> since in the predict_steps, I dont force to stop early when decoder generate the first <EOS>. This is not a problem since, during training, a mask (with label length) is applied on the loss ( generate redundent tokens is not a problem), while during testing, I can remove all the tokens after the first appearance of <EOS>
@@ -29,6 +29,8 @@ def bleu_eval(label_tokens: Union[str, List], pred_tokens: Union[str, List], k:i
       break      
   pred_tokens = pred_tokens[:idx]
   
+  print(pred_tokens)
+  print(label_tokens)
   len_label, len_pred = len(label_tokens), len(pred_tokens)
   scores = np.exp(min(0,1-len_label/len_pred))
   for n in range(1, k+1):

@@ -95,7 +95,7 @@ class Trainer(object):
           loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
           loss = (loss * torch.flatten(mask)).sum() / mask.sum()
           running_loss += loss.item()
-      
+        
         print("Overall test set loss is: {}".format(running_loss))
   
   def train(self):

@@ -83,7 +83,8 @@ class EncoderDecoder(nn.Module):
     outputs, _ = self.decoder(y, context, None) # No need to initalize the hidden first, the lstm will automatically initialize one
     return outputs # (batch_size, seq_len, vocab_size)
   
-  def predict_step(self, X, y, num_steps: int):
+  def predict_step(self, X, y):
+    num_steps = y.size()[1]
     # y: batch_size, seq_len
     encoded_input, _ = self.encoder(X, None)
     # encoded_input: num_layers, batch_size, hidden_size
@@ -99,7 +100,7 @@ class EncoderDecoder(nn.Module):
       predicted_token = torch.argmax(distribution, dim=-1)
       # predicted_token: batch_size, 1
       outputs = torch.cat((outputs, predicted_token), dim=1)
-    
+    # outputs: batch_size, seq_len
     return outputs
         
 

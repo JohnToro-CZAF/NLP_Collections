@@ -91,15 +91,18 @@ class EncoderDecoder(nn.Module):
     context = encoded_input[:, -1, :] # only take the last layer hidden state
     context = context.unsqueeze(0)
     # context : batch_size, hidden_size
-    outputs = y[:, 0].unsqueeze(1) # Take the first token of y
-    # output: batch_size, 1
+    pred_tokens = y[:, 0].unsqueeze(1) # Take the first token of y <BOS>
+    # pred_tokens: batch_size, 1
+    outputs = []
+    # outputs: num_steps, batch_size, vocab_size (distribution)
     H_C = None
     for _ in range(num_steps):
-      distribution, H_C = self.decoder(outputs[:,-1].unsqueeze(1), context, H_C) # Take the last step of output
+      distribution, H_C = self.decoder(pred_tokens[:,-1].unsqueeze(1), context, H_C) # Take the last step of output
       # distribution: batch_size, 1, vocab_size
-      outputs = torch.cat((outputs, distribution), dim=1)
-    # outputs: batch_size, seq_len, vocab_size
-    return outputs
+      pred_tokens = torch.cat((pred_tokens, torch.argmax(distribution, dim=-1)), dim=-1)
+      outputs.append(distribution.squeeze(1)) # -> batch_size, vocab_soze
+    # outputs: seq_len, batch_size, vocab_size
+    return torch.stack(outputs, dim=0).transpose(0, 1)
         
 
 if __name__ == "__main__":

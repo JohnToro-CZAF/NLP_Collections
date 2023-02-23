@@ -49,6 +49,7 @@ class LSTMLayer(nn.Module):
     self.lstm.init_weight(f)
 
   def forward(self, X, H_C):
+    #X : seq_len, batch_size, input_dim
     if H_C is None:
       H, C = self.init_hidden(X.size()[1])
     else:
@@ -77,33 +78,42 @@ class DeepLSTM(nn.Module):
     for layer in self.layers:
       layer.init_weight(f)
 
-  def forward(self, X):
-    # X: seq_len, batch_size, input_dim
+  def init_hidden(self, batch_size):
+    H, C = [], []
+    h, c = self.input_layer.init_hidden(batch_size)
+    H.append(h), C.append(c)
+    for layer in self.layers:
+      h, c = layer.init_hidden(batch_size)
+      H.append(h), C.append(c)
+    
+    return (torch.stack(H), torch.stack(C))
+    
+  def forward(self, X, state):
+    # X: seq_len, batch_size, input_dim,
+    # state = (H, C): num_layers, batch_size, hidden_dim
+    if state is None:
+      state = self.init_hidden(X.size()[1])
+
     last_hiddens, last_cells = [], []
-    H, C = self.input_layer.init_hidden(X.size()[1])
-    H = H.to(X.device)
-    C = C.to(X.device)
-    last_hiddens.append(H), last_cells.append(C)
-    outputs, (hidden, cell) = self.input_layer(X, (H, C))
+    outputs, (hidden, cell) = self.input_layer(X, (state[0][0], state[1][0]))
+    last_hiddens.append(hidden), last_cells.append(cell)
     # outputs are the hiddens in the layer
     # outputs: seq_len, batch_size, hidden_dim
-    for layer in self.layers:
-      H, C = layer.init_hidden(X.size()[1])
-      H = H.to(X.device)
-      C = C.to(X.device)
-      outputs, (H, C) = layer(outputs, (H, C))
+    for ith, layer in enumerate(self.layers):
+      outputs, (H, C) = layer(outputs, (state[0][ith+1], state[1][ith+1]))
       last_hiddens.append(H), last_cells.append(C)
     
     # last_hiddens: num_layers, batch_size, hidden_dim
-    # outputs: batch_size, seq_len, hidden_dim
+    # outputs: seq_len, batch_size, hidden_dim
     return outputs, (torch.stack(last_hiddens), torch.stack(last_cells))
-
-def init_weight(module: nn.Module):
-  if type(module) == nn.Linear:
-    nn.init.xavier_uniform_(module.weight)
-
+  
 if __name__ == "__main__":
   lstm = DeepLSTM(input_dim=10, hidden_dim=20, num_layers=4)
+  
+  def init_weight(module: nn.Module):
+    if type(module) == nn.Linear:
+      nn.init.xavier_uniform_(module.weight)
+    
   lstm.init_weight(init_weight)
   X = torch.rand((3, 5, 10))
   outputs, (last_hiddens, last_cells) = lstm(X)

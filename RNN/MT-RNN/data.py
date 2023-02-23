@@ -74,6 +74,7 @@ class EngFranRawDataset(Dataset):
 
   def get_tokenizer(self):
     return Tokenizer(self.vocab, self.vocab_size)
+
 class TranslationDataset(Dataset):
   def __init__(self, dataset, vocab, vocab_size):
     super(TranslationDataset, self).__init__()

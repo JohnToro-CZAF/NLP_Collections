@@ -10,6 +10,7 @@ import numpy as np
 import argparse
 from tqdm import tqdm
 from datetime import datetime
+from utils import bleu_eval
 
 tb = SummaryWriter('./runs')
 
@@ -89,7 +90,7 @@ class Trainer(object):
           X = X.to(self.device)
           y = y.to(self.device)
           y_hat = y_hat.to(self.device)
-          outputs = self.model(X, y)
+          outputs = self.model.predict_step(X, y)
           mask = (y != self.tokenizer.pad_token_id).float()
           loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
           loss = (loss * torch.flatten(mask)).sum() / mask.sum()

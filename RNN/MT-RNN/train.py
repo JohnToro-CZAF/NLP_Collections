@@ -93,7 +93,6 @@ class Trainer(object):
   def test(self):
     self.model.eval()
     with torch.no_grad():
-      running_loss = 0.0
       with tqdm(self.test_data, unit="batch") as tepoch:
         bleu = 0.0
         for i, (X, y, y_hat) in enumerate(self.test_data):
@@ -102,7 +101,7 @@ class Trainer(object):
           X = X.to(self.device)
           y = y.to(self.device)
           y_hat = y_hat.to(self.device)
-          outputs = self.model.predict_step(X, y)
+          outputs = self.model.predict_step(X, y, 'test', max_length=25)
           # outputs: batch_size, seq_len, vocab_size
           
           for i, (b, label) in enumerate(zip(torch.argmax(outputs, dim=-1), y)):

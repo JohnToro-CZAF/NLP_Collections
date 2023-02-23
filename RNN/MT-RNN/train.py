@@ -109,10 +109,10 @@ class Trainer(object):
             label_tokens = self.tokenizer.ids_2_tokens(label, lang='fra')
             source_tokens = self.tokenizer.ids_2_tokens(X[i], lang='eng')
             pred_tokens = self.tokenizer.ids_2_tokens(b, lang='fra')
-            print("Source sentence", " ".join(source_tokens))
-            print("Target sentence", " ".join(label_tokens))
-            print("Predicted sentence", " ".join(pred_tokens))
-            score_in_batch = bleu_eval(label_tokens, pred_tokens, k=5)
+            # print("Source sentence", " ".join(source_tokens))
+            # print("Target sentence", " ".join(label_tokens))
+            # print("Predicted sentence", " ".join(pred_tokens))
+            score_in_batch = bleu_eval(label_tokens[1:], pred_tokens, k=5) # not consider <BOS> token in the begining
           
           score_in_batch /= y.size()[0]
           bleu += score_in_batch
@@ -124,14 +124,15 @@ class Trainer(object):
     for epoch in range(args.epochs):
       self.train_epoch(epoch)
       self.val_epoch(epoch)
-    self.test()
+      if epoch % 10 == 9:
+        self.test()
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--data_path', type=str, default='data/eng-fra.txt')
   parser.add_argument('--num_workers', type=int, default=16)
   parser.add_argument('--batch_size', type=int, default=256)
-  parser.add_argument('--epochs', type=int, default=1)
+  parser.add_argument('--epochs', type=int, default=40)
   parser.add_argument('--lr', type=float, default=0.005)
   parser.add_argument('--weight_decay', type=float, default=0.0001)
   parser.add_argument('--dropout', type=float, default=0.2)

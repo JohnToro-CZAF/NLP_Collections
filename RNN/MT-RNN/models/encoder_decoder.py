@@ -83,8 +83,13 @@ class EncoderDecoder(nn.Module):
     outputs, _ = self.decoder(y, context, None) # No need to initalize the hidden first, the lstm will automatically initialize one
     return outputs # (batch_size, seq_len, vocab_size)
   
-  def predict_step(self, X, y):
-    num_steps = y.size()[1]
+  def predict_step(self, X, y, mode='train', max_length=None):
+    if mode == 'train':
+      # During teaching forcing, the output sentence must have a similar length to the label
+      num_steps = y.size()[1]
+    else:
+      # During evaluate process, decoder generate as many as tokens as it likes, only until it meets the <EOS> token or max_length
+      num_steps = max_length
     # y: batch_size, seq_len
     encoded_input, _ = self.encoder(X, None)
     # encoded_input: num_layers, batch_size, hidden_size
@@ -99,7 +104,8 @@ class EncoderDecoder(nn.Module):
     for _ in range(num_steps):
       distribution, H_C = self.decoder(pred_tokens[:,-1].unsqueeze(1), context, H_C) # Take the last step of output
       # distribution: batch_size, 1, vocab_size
-      pred_tokens = torch.cat((pred_tokens, torch.argmax(distribution, dim=-1)), dim=-1)
+      pred_token = torch.argmax(distribution, dim=-1) # batch_size, 1
+      pred_tokens = torch.cat((pred_tokens, pred_token), dim=-1)
       outputs.append(distribution.squeeze(1)) # -> batch_size, vocab_soze
     # outputs: seq_len, batch_size, vocab_size
     return torch.stack(outputs, dim=0).transpose(0, 1)

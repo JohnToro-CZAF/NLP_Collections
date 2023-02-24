@@ -21,18 +21,20 @@ class Encoder(nn.Module):
     self.lstm.init_weight(init_weight)
     self.apply(init_weight)
 
-  def forward(self, X, state):
-    # X: batch_size, seq_len
-    # embs: batch_size, seq_len, embedding_size
-    embs = self.embedding(X)
+  def forward(self, X):
+    """
+    inputs:
+      # X: batch_size, seq_len
+    returns:
+      # output: batch_size, seq_len, hidden_size (last layer hiddens)
+      # hidden: num_layers, batch_size, hidden_size (only takes the last hidden state for each layer)
+      # cell: num_layers, batch_size, hidden_size
+    """
+    embs = self.embedding(X) # batch_size, seq_len, embedding_size
     embs = F.relu(embs)
-    # output: batch_size, seq_len, hidden_size (last layer hiddens)
-    # hidden: num_layers, batch_size, hidden_size (only takes the last hidden state for each layer)
-    # cell: num_layers, batch_size, hidden_size
     outputs, (hidden, cell) = self.lstm(embs.transpose(0, 1), state)
     #outputs: seq_len, batch_size, hidden_size
     outputs = outputs.permute(1, 0, 2)
-    #outputs: batch_size, seq_len, hidden_size
     return outputs, (hidden, cell)
 
 class Decoder(nn.Module):
@@ -54,39 +56,25 @@ class Decoder(nn.Module):
   def init_hidden(self, batch_size):
     return self.lstm.init_hidden(batch_size)
   
-  def forward(self, y, H_C):
-    # y: batch_size, seq_len
-    embs = self.embedding(y)
-    embs = F.relu(embs)
-    # embs: batch_size, seq_len, embedding_size
-    # context: seq_len, batch_size, hidden_size
-    outputs, (hidden, cell) = self.lstm(embs.transpose(0, 1), H_C)
-    # outputs: seq_len, batch_size, hidden_size
-    outputs = self.softmax(self.fc(outputs))
-    # outputs: seq_len, batch_size, vocab_size
-    outputs = outputs.permute(1, 0, 2)
-    # outputs: batch_size, seq_len, vocab_size
-    # Hidden: num_layers, batch_size, hidden_size
-    return outputs, (hidden, cell)
-
-class AttnDecoder(nn.Module):
-  def __init__(self, vocab_size, embedding_size, hidden_size, num_layers, dropout):
-    super(AttnDecoder, self).__init__()
-    self.vocab_size = vocab_size
-    self.embedding_size = embedding_size
-    self.hidden_size = hidden_size
-    self.num_layers = num_layers
-    self.dropout = dropout
-    
-  def _init_weight(self):
-    self.lstm.init_weight(init_weight)
-    self.apply(init_weight)
-  
   def forward(self, y, context, H_C):
-    # here the context is a sequence length of hiddens
-    # batch_size, seq_len, hidden_size
-    
-    pass
+    """
+    summary:
+      For teaching forcing, input entire the target sequence to decoder lstm
+    inputs:
+      # y: batch_size, seq_len
+      # context: seq_len, batch_size, hidden_size (last layer hidden, not really use, if we dont use attention)
+      # H_C: [num_layers, batch_size, hidden_size]*2 (each layer is initialized with last hidden in context)
+    returns:
+      # outputs: batch_size, seq_len, vocab_size
+      # hidden: num_layers, batch_size, hidden_size
+      # cell: num_layers, batch_size, hidden_size
+    """
+    embs = self.embedding(y) # batch_size, seq_len, embedding_size
+    embs = F.relu(embs)
+    outputs, (hidden, cell) = self.lstm(embs.transpose(0, 1), H_C)
+    outputs = self.softmax(self.fc(outputs)) # seq_len, batch_size, vocab_size
+    outputs = outputs.permute(1, 0, 2)
+    return outputs, (hidden, cell)
 
 class EncoderDecoder(nn.Module):
   def __init__(self, encoder, decoder):
@@ -97,44 +85,56 @@ class EncoderDecoder(nn.Module):
     self.decoder._init_weight()
 
   def forward(self, X, y):
-    # Teach forcing, pass a whole sentence y to decoder
-    encoded_input, _ = self.encoder(X, None) # No need to initalize the hidden first, the lstm will automatically initialize one
-    # encoded_input: batch_size, seq_len, hidden_size
-    context = encoded_input[:, -1, :] # only take the last hidden state in the sequence
-    # context: batch_size, hidden_size
-    # y: batch_size, seq_len
+    """
+    summary:
+      For teaching forcing, input entire the target sequence to decoder lstm
+    inputs:
+      # X: batch_size, input_seq_len
+      # y: batch_size, decode_seq_len
+    returns:
+      # outputs: batch_size, decode_seq_len, vocab_size (output distribution)
+    """
+    encoded_input = self.encoder(X) # batch_size, input_seq_len, hidden_size
+    context = encoded_input[:, -1, :] # batch_size, hidden_size (take the last hidden in input sequence)
     _, C = self.decoder.init_hidden(X.size()[0])
-    # context: num_layers, batch_size, hidden_size
-    outputs, _ = self.decoder(y, (context.repeat(self.decoder.num_layers, 1, 1), C))
+    H = context.repeat(self.decoder.num_layers, 1, 1) # num_layers, batch_size, hidden_size (initialize decoder with context in all layers)
+    outputs, _ = self.decoder(y, (H, C))
     return outputs # (batch_size, seq_len, vocab_size)
   
   def predict_step(self, X, y, mode='train', max_length=None):
+    """
+    summary:
+      For predicting, output token of last step will be the input of next step
+    inputs:
+      # X: batch_size, input_seq_len
+      # y: batch_size, decode_seq_len
+      # max_length (during evaluate process, decoder generate as many as tokens as it likes, only until it meets the <EOS> token or max_length)
+    returns:
+      # outputs: batch_size, decode_seq_len|max_length, vocab_size (output distribution)
+      # pred_tokens: batch_size, decode_deq_len|max_length
+    """
+    
     if mode == 'train':
       # During teaching forcing, the output sentence must have a similar length to the label
       num_steps = y.size()[1]
     else:
-      # During evaluate process, decoder generate as many as tokens as it likes, only until it meets the <EOS> token or max_length
       num_steps = max_length
-    # y: batch_size, seq_len
-    encoded_input, _ = self.encoder(X, None)
-    # encoded_input: batch_size, seq_len, hidden_size
-    context = encoded_input[:, -1, :] # only take the last layer hidden state
-    # context: batch_size, hidden_size
-    pred_tokens = y[:, 0].unsqueeze(1) # Take the first token of y <BOS>
-    # pred_tokens: batch_size, 1
+    
+    encoded_input = self.encoder(X) # batch_size, seq_len, hidden_size
+    context = encoded_input[:, -1, :] # batch_size, hidden_size (take the last hidden in input sequence)
+    pred_tokens = y[:, 0].unsqueeze(1) # batch_size, 1 (Take the first token of y <BOS>)
     outputs = []
-    # outputs: num_steps, batch_size, vocab_size (distribution)
     _, C = self.decoder.init_hidden(X.size()[0])
-    H_C = (context.repeat(self.decoder.num_layers,1,1), C)
+    H = context.repeat(self.decoder.num_layers,1,1)
     
     for i in range(num_steps):
-      distribution, H_C = self.decoder(pred_tokens[:,-1].unsqueeze(1), H_C) # Take the last step of output
+      distribution, (H, C) = self.decoder(pred_tokens[:,-1].unsqueeze(1), context, (H, C)) # Take the last step of output
       # distribution: batch_size, 1, vocab_size
       pred_token = torch.argmax(distribution, dim=-1) # batch_size, 1
       pred_tokens = torch.cat((pred_tokens, pred_token), dim=-1)
       outputs.append(distribution.squeeze(1)) # -> batch_size, vocab_soze
-    # outputs: seq_len, batch_size, vocab_size
-    # pred_tokens: batch_size, seq_len
+    
+    # outputs: num_steps, batch_size, vocab_size
     return torch.stack(outputs, dim=0).transpose(0, 1), pred_tokens
 
 if __name__ == "__main__":

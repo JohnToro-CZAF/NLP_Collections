@@ -134,10 +134,11 @@ class DeepLSTM(nn.Module):
       H.append(h), C.append(c)
     return [torch.stack(H), torch.stack(C)]
     
-  def forward(self, X):
+  def forward(self, X, state=None):
     # X: seq_len, batch_size, input_dim,
     # state = (H, C): num_layers, batch_size, hidden_dim
-    state = self.init_hidden(X.size()[1])
+    if state is None:
+      state = self.init_hidden(X.size()[1])
 
     last_hiddens, last_cells = [], []
     outputs, (hidden, cell) = self.input_layer(X, (state[0][0], state[1][0]))

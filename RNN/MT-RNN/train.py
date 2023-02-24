@@ -15,6 +15,8 @@ from utils import bleu_eval
 import random
 
 tb = SummaryWriter('./runs/run1')
+# attention = "attn"
+attention = None
 
 class TrainingArgs(object):
   def __init__(self, epochs, lr, weight_decay, teaching_forcing, clip):
@@ -61,11 +63,15 @@ class Trainer(object):
         self.decoder_optimizer.zero_grad()
         
         if random.random() < self.args.teaching_forcing:
-          outputs, pred_tokens = self.model.predict_step(X, y)
+          if attention == "attn":
+            outputs, attn_scores, pred_tokens = self.model.predict_step(X, y)
+          else:
+            outputs, pred_tokens = self.model.predict_step(X, y)
         else:
           outputs = self.model(X, y)
 
         mask = (y != self.tokenizer.pad_token_id).float()
+        # print(mask)
         loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
         loss = (loss * torch.flatten(mask)).sum() / mask.sum()
         running_loss += loss.item()
@@ -97,7 +103,10 @@ class Trainer(object):
           self.decoder_optimizer.zero_grad()
 
           if random.random() < self.args.teaching_forcing:
-            outputs, pred_tokens = self.model.predict_step(X, y)
+            if attention == "attn":
+              outputs, attn_scores, pred_tokens = self.model.predict_step(X, y)
+            else:
+              outputs, pred_tokens = self.model.predict_step(X, y)
           else:
             outputs = self.model(X, y)
 
@@ -109,7 +118,7 @@ class Trainer(object):
       
       tb.add_scalar("Val Loss", running_loss/len(self.val_data), epoch)
   
-  def test(self):
+  def test(self, epoch):
     self.model.eval()
     with torch.no_grad():
       with tqdm(self.test_data, unit="batch") as tepoch:
@@ -123,7 +132,11 @@ class Trainer(object):
           self.encoder_optimizer.zero_grad()
           self.decoder_optimizer.zero_grad()
 
-          outputs, pred_tokens = self.model.predict_step(X, y, 'test', max_length=25)
+          if attention == "attn":
+            outputs, attn_scores, pred_tokens = self.model.predict_step(X, y, 'test', decode_max_length=25)
+          else:
+            outputs, pred_tokens = self.model.predict_step(X, y, 'test', decode_max_length=25)
+          
           # outputs: batch_size, seq_len, vocab_size
           # pred_tokens: batch_size, seq_len
           for i, (b, label) in enumerate(zip(pred_tokens, y)):
@@ -139,21 +152,22 @@ class Trainer(object):
           bleu += score_in_batch
         
         bleu /= len(self.test_data)
-        print("BLEU score is:", bleu)      
+        print("BLEU score is:", bleu)
+        tb.add_scalar("BLEU Test", bleu, epoch)   
   
   def train(self):
     for epoch in range(args.epochs):
       self.train_epoch(epoch)
       self.val_epoch(epoch)
       # if epoch % 2 == 1:
-      self.test()
+      self.test(epoch)
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--data_path', type=str, default='data/eng-fra.txt')
   parser.add_argument('--num_workers', type=int, default=16)
-  parser.add_argument('--batch_size', type=int, default=512)
-  parser.add_argument('--epochs', type=int, default=40)
+  parser.add_argument('--batch_size', type=int, default=256)
+  parser.add_argument('--epochs', type=int, default=50)
   parser.add_argument('--lr', type=float, default=0.0001)
   parser.add_argument('--weight_decay', type=float, default=0.0001)
   parser.add_argument('--dropout', type=float, default=0.2)
@@ -168,33 +182,39 @@ if __name__ == "__main__":
   device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
   print("Training on device: {}".format(device))
   print("Getting data loaders from dataset")
+  
   train, val, test, tokenizer = \
     get_data_loader(batch_size=args.batch_size, 
                     num_workers=args.num_workers, 
-                    filename=args.data_path,
-                    global_max_len=25)
+                    filename=args.data_path)
+
+  # train, val, test, tokenizer = \
+  #   get_data_loader(batch_size=args.batch_size, 
+  #                   num_workers=args.num_workers, 
+  #                   filename=args.data_path,
+  #                   global_max_len=60)
   
-  # encoder = Encoder(vocab_size=train.dataset.vocab_size['eng'],
-  #                   embedding_size=256,
-  #                   hidden_size=256,
-  #                   num_layers=4,
-  #                   dropout=args.dropout).to(device)
-  encoder = EncoderAttn(vocab_size=train.dataset.vocab_size['eng'],
+  encoder = Encoder(vocab_size=train.dataset.vocab_size['eng'],
                     embedding_size=256,
                     hidden_size=256,
-                    num_layers=3,
+                    num_layers=4,
                     dropout=args.dropout).to(device)
-  # decoder = Decoder(vocab_size=train.dataset.vocab_size['fra'],
+  # encoder = AttnEncoder(vocab_size=train.dataset.vocab_size['eng'],
   #                   embedding_size=256,
   #                   hidden_size=256,
-  #                   num_layers=2,
+  #                   num_layers=3,
   #                   dropout=args.dropout).to(device)
-  decoder = DecoderAttn(vocab_size=train.dataset.vocab_size['fra'],
+  decoder = Decoder(vocab_size=train.dataset.vocab_size['fra'],
                     embedding_size=256,
                     hidden_size=256,
                     num_layers=2,
-                    dropout=args.dropout,
-                    max_length=20).to(device)
+                    dropout=args.dropout).to(device)
+  # decoder = AttnDecoder(vocab_size=train.dataset.vocab_size['fra'],
+  #                   embedding_size=256,
+  #                   hidden_size=256,
+  #                   num_layers=1,
+  #                   dropout=args.dropout,
+  #                   max_length=60).to(device)
   
   training_args = TrainingArgs(
     epochs=args.epochs,
@@ -205,6 +225,7 @@ if __name__ == "__main__":
   
   encoder_optimizer = torch.optim.Adam(encoder.parameters(), lr=args.lr, weight_decay=args.weight_decay)
   decoder_optimizer = torch.optim.Adam(decoder.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+  # model = EncoderAttnDecoder(encoder, decoder).to(device)
   model = EncoderDecoder(encoder, decoder).to(device)
   
   if args.load_path is not None:
@@ -213,7 +234,7 @@ if __name__ == "__main__":
   trainer = Trainer(model=model, 
                    train=train, 
                    val=val, 
-                   test=test, 
+                   test=test,
                    tokenizer=tokenizer,
                    device=device,
                    encoder_optimizer=encoder_optimizer,

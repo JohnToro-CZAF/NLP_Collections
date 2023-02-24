@@ -1,6 +1,7 @@
 import argparse 
 from tqdm import tqdm
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from collections import defaultdict, Counter, namedtuple
 import torch.nn.functional as F
@@ -25,6 +26,7 @@ class EngFranRawDataset(Dataset):
     }
 
   def read_data(self):
+    longest_len = 0
     with open(self.filename, 'r', encoding='utf-8') as f:
       for i, _ in enumerate(tqdm(f)):
         EngFra = defaultdict(str)
@@ -39,8 +41,10 @@ class EngFranRawDataset(Dataset):
           else:
             sentence = sentence + ["<EOS>"]
           EngFra[lang] = sentence
+          longest_len = max(longest_len, len(sentence))
         EngFra['fra_label'] = EngFra['fra'][1:] + ["<EOS>"]
         self.corpus.append(EngFra)
+      print("Longest sentence is: ", longest_len)
 
   def build_vocab(self):
     self.vocab_eng = {"<PAD>": 0, "<BOS>": 1, "<EOS>": 2, "<UNK>": 3}
@@ -128,7 +132,8 @@ def collate_fn_max_batch(data):
 
 def collate_fn_max_length(data, max_length=100):
   # pad first seq to desired length
-  eng, frq, fra_label = zip(*data)
+  eng, fra, fra_label = zip(*data)
+  eng = list(eng)
   eng[0] = nn.ConstantPad1d((0, max_length - eng[0].shape[0]), 0)(eng[0])
   eng = torch.nn.utils.rnn.pad_sequence(eng, batch_first=True, padding_value=0)
   fra = torch.nn.utils.rnn.pad_sequence(fra, batch_first=True, padding_value=0)

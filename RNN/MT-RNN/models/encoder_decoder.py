@@ -98,10 +98,10 @@ class EncoderDecoder(nn.Module):
     context = encoded_input[:, -1, :] # batch_size, hidden_size (take the last hidden in input sequence)
     _, C = self.decoder.init_hidden(X.size()[0])
     H = context.repeat(self.decoder.num_layers, 1, 1) # num_layers, batch_size, hidden_size (initialize decoder with context in all layers)
-    outputs, _ = self.decoder(y, (H, C))
+    outputs, _ = self.decoder(y, context, (H, C))
     return outputs # (batch_size, seq_len, vocab_size)
   
-  def predict_step(self, X, y, mode='train', max_length=None):
+  def predict_step(self, X, y, mode='train', decode_max_length=None):
     """
     summary:
       For predicting, output token of last step will be the input of next step
@@ -118,7 +118,7 @@ class EncoderDecoder(nn.Module):
       # During teaching forcing, the output sentence must have a similar length to the label
       num_steps = y.size()[1]
     else:
-      num_steps = max_length
+      num_steps = decode_max_length
     
     encoded_input, _ = self.encoder(X) # batch_size, seq_len, hidden_size
     context = encoded_input[:, -1, :] # batch_size, hidden_size (take the last hidden in input sequence)

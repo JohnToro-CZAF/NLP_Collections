@@ -24,6 +24,16 @@ class TrainingArgs(object):
     self.teaching_forcing = teaching_forcing
     self.clip = clip
 
+class HyperParams(object):
+  def __init__(self, epochs, lr, teaching_forcing, clip, weight_decay, batch_size, dropout):
+    self.epochs = epochs
+    self.lr = lr
+    self.teaching_forcing = teaching_forcing
+    self.clip = clip
+    self.weight_decay = weight_decay
+    self.batch_size = batch_size
+    self.dropout = dropout
+
 class Trainer(object):
   def __init__(self, model, train, val, test, tokenizer, device, encoder_optimizer, decoder_optimizer, args=None):
     self.model = model
@@ -95,7 +105,6 @@ class Trainer(object):
           loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
           loss = (loss * torch.flatten(mask)).sum() / mask.sum()
           running_loss += loss.item()
-          
           tepoch.set_postfix(loss=loss.item()/X.size()[0])
       
       tb.add_scalar("Val Loss", running_loss/len(self.val_data), epoch)
@@ -143,16 +152,16 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--data_path', type=str, default='data/eng-fra.txt')
   parser.add_argument('--num_workers', type=int, default=16)
-  parser.add_argument('--batch_size', type=int, default=256)
-  parser.add_argument('--epochs', type=int, default=10)
-  parser.add_argument('--lr', type=float, default=0.005)
+  parser.add_argument('--batch_size', type=int, default=512)
+  parser.add_argument('--epochs', type=int, default=40)
+  parser.add_argument('--lr', type=float, default=0.0001)
   parser.add_argument('--weight_decay', type=float, default=0.0001)
   parser.add_argument('--dropout', type=float, default=0.2)
   parser.add_argument('--teaching_forcing', type=float, default=0.5)
   parser.add_argument('--clip', type=float, default=1)
 
   parser.add_argument('--save_path', type=str, default='./saved_models/')
-  # parser.add_argument('--load_path', type=str, default='./saved_models/23:22:32:38')
+  # parser.add_argument('--load_path', type=str, default='./saved_models/23:01:25:08')
   parser.add_argument('--load_path', type=str, default=None)
   args = parser.parse_args()
 
@@ -173,7 +182,7 @@ if __name__ == "__main__":
   encoder = EncoderAttn(vocab_size=train.dataset.vocab_size['eng'],
                     embedding_size=256,
                     hidden_size=256,
-                    num_layers=4,
+                    num_layers=3,
                     dropout=args.dropout).to(device)
   # decoder = Decoder(vocab_size=train.dataset.vocab_size['fra'],
   #                   embedding_size=256,

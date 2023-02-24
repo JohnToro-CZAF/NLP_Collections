@@ -84,7 +84,6 @@ class AttnDecoder(nn.Module):
       # TODO: Currenlty the attention is only applied to one layer only: how to scale to multiple layers?
       attn_scores = self.softmax(self.attn(torch.concat((H[0], input), -1)))
       # batch_size, max_len -> (batch_size, 1, max_len) * (batch_size, max_len, hidden_size)
-      # print(attn_scores.unsqueeze(1), context.size())
       attn_vector = torch.bmm(attn_scores.unsqueeze(1), context)
       # new_input is fused version of input and attened vector
       attn_vector = attn_vector.squeeze(1) # batch_size, hidden_size

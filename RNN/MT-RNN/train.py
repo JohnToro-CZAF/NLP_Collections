@@ -14,9 +14,9 @@ from datetime import datetime
 from utils import bleu_eval
 import random
 
-tb = SummaryWriter('./runs/run1')
-# attention = "attn"
-attention = None
+tb = SummaryWriter('./runs/run3')
+attention = "attn"
+# attention = None
 
 class TrainingArgs(object):
   def __init__(self, epochs, lr, weight_decay, teaching_forcing, clip):
@@ -183,38 +183,38 @@ if __name__ == "__main__":
   print("Training on device: {}".format(device))
   print("Getting data loaders from dataset")
   
-  train, val, test, tokenizer = \
-    get_data_loader(batch_size=args.batch_size, 
-                    num_workers=args.num_workers, 
-                    filename=args.data_path)
-
   # train, val, test, tokenizer = \
   #   get_data_loader(batch_size=args.batch_size, 
   #                   num_workers=args.num_workers, 
-  #                   filename=args.data_path,
-  #                   global_max_len=60)
+  #                   filename=args.data_path)
+
+  train, val, test, tokenizer = \
+    get_data_loader(batch_size=args.batch_size, 
+                    num_workers=args.num_workers, 
+                    filename=args.data_path,
+                    global_max_len=60)
   
-  encoder = Encoder(vocab_size=train.dataset.vocab_size['eng'],
-                    embedding_size=256,
-                    hidden_size=256,
-                    num_layers=4,
-                    dropout=args.dropout).to(device)
-  # encoder = AttnEncoder(vocab_size=train.dataset.vocab_size['eng'],
+  # encoder = Encoder(vocab_size=train.dataset.vocab_size['eng'],
   #                   embedding_size=256,
   #                   hidden_size=256,
-  #                   num_layers=3,
+  #                   num_layers=4,
   #                   dropout=args.dropout).to(device)
-  decoder = Decoder(vocab_size=train.dataset.vocab_size['fra'],
+  encoder = AttnEncoder(vocab_size=train.dataset.vocab_size['eng'],
                     embedding_size=256,
                     hidden_size=256,
-                    num_layers=2,
+                    num_layers=3,
                     dropout=args.dropout).to(device)
-  # decoder = AttnDecoder(vocab_size=train.dataset.vocab_size['fra'],
+  # decoder = Decoder(vocab_size=train.dataset.vocab_size['fra'],
   #                   embedding_size=256,
   #                   hidden_size=256,
-  #                   num_layers=1,
-  #                   dropout=args.dropout,
-  #                   max_length=60).to(device)
+  #                   num_layers=2,
+  #                   dropout=args.dropout).to(device)
+  decoder = AttnDecoder(vocab_size=train.dataset.vocab_size['fra'],
+                    embedding_size=256,
+                    hidden_size=256,
+                    num_layers=1,
+                    dropout=args.dropout,
+                    max_length=60).to(device)
   
   training_args = TrainingArgs(
     epochs=args.epochs,
@@ -225,8 +225,8 @@ if __name__ == "__main__":
   
   encoder_optimizer = torch.optim.Adam(encoder.parameters(), lr=args.lr, weight_decay=args.weight_decay)
   decoder_optimizer = torch.optim.Adam(decoder.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-  # model = EncoderAttnDecoder(encoder, decoder).to(device)
-  model = EncoderDecoder(encoder, decoder).to(device)
+  model = EncoderAttnDecoder(encoder, decoder).to(device)
+  # model = EncoderDecoder(encoder, decoder).to(device)
   
   if args.load_path is not None:
     checkpoint = torch.load(args.load_path)

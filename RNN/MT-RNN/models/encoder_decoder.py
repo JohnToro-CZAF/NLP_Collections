@@ -32,7 +32,7 @@ class Encoder(nn.Module):
     """
     embs = self.embedding(X) # batch_size, seq_len, embedding_size
     embs = F.relu(embs)
-    outputs, (hidden, cell) = self.lstm(embs.transpose(0, 1), state)
+    outputs, (hidden, cell) = self.lstm(embs.transpose(0, 1))
     #outputs: seq_len, batch_size, hidden_size
     outputs = outputs.permute(1, 0, 2)
     return outputs, (hidden, cell)
@@ -61,11 +61,11 @@ class Decoder(nn.Module):
     summary:
       For teaching forcing, input entire the target sequence to decoder lstm
     inputs:
-      # y: batch_size, seq_len
-      # context: seq_len, batch_size, hidden_size (last layer hidden, not really use, if we dont use attention)
+      # y: batch_size, decode_seq_len
+      # context: input_seq_len, batch_size, hidden_size (last layer hidden, not really use, if we dont use attention)
       # H_C: [num_layers, batch_size, hidden_size]*2 (each layer is initialized with last hidden in context)
     returns:
-      # outputs: batch_size, seq_len, vocab_size
+      # outputs: batch_size, decode_seq_len, vocab_size
       # hidden: num_layers, batch_size, hidden_size
       # cell: num_layers, batch_size, hidden_size
     """
@@ -94,7 +94,7 @@ class EncoderDecoder(nn.Module):
     returns:
       # outputs: batch_size, decode_seq_len, vocab_size (output distribution)
     """
-    encoded_input = self.encoder(X) # batch_size, input_seq_len, hidden_size
+    encoded_input, _ = self.encoder(X) # batch_size, input_seq_len, hidden_size
     context = encoded_input[:, -1, :] # batch_size, hidden_size (take the last hidden in input sequence)
     _, C = self.decoder.init_hidden(X.size()[0])
     H = context.repeat(self.decoder.num_layers, 1, 1) # num_layers, batch_size, hidden_size (initialize decoder with context in all layers)
@@ -120,7 +120,7 @@ class EncoderDecoder(nn.Module):
     else:
       num_steps = max_length
     
-    encoded_input = self.encoder(X) # batch_size, seq_len, hidden_size
+    encoded_input, _ = self.encoder(X) # batch_size, seq_len, hidden_size
     context = encoded_input[:, -1, :] # batch_size, hidden_size (take the last hidden in input sequence)
     pred_tokens = y[:, 0].unsqueeze(1) # batch_size, 1 (Take the first token of y <BOS>)
     outputs = []

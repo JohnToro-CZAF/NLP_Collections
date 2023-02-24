@@ -22,7 +22,7 @@ class LSTMCell(nn.Module):
     self.apply(f)
   
   def init_hidden(self, batch_size):
-      return [torch.zeros(batch_size, self.hidden_dim), torch.zeros(batch_size, self.hidden_dim)]
+    return [torch.zeros(batch_size, self.hidden_dim), torch.zeros(batch_size, self.hidden_dim)]
   
   def forward(self, input, H_C):
     H, C = H_C
@@ -38,9 +38,38 @@ class LSTMCell(nn.Module):
     H = self.tanh(C_new) * O_gate
     return H, [H, C_new]
 
+class LSTMLayer(nn.Module):
+  def __init__(self, input_dim, hidden_dim, dropout):
+    super(LSTMLayer, self).__init__()
+    self.input_dim = input_dim
+    self.hidden_dim = hidden_dim
+    self.dropout = dropout
+    self.lstm = LSTMCell(input_dim=input_dim, hidden_dim=hidden_dim, dropout=dropout)
+
+  def init_hidden(self, batch_size):
+    # one for cell, one for hidden
+    return torch.zeros((2, batch_size, self.hidden_dim))
+
+  def init_weight(self, f):
+    self.lstm.init_weight(f)
+
+  def forward(self, X, H_C):
+    #X : seq_len, batch_size, input_dim
+    if H_C is None:
+      H, C = self.init_hidden(X.size()[1])
+    else:
+      H, C = H_C
+    outputs = []
+    for input in X:
+      # input: batch_size, input_dim
+      output, (H, C) = self.lstm(input, (H, C))
+      outputs.append(output)
+    # outputs: seq_len, batch_size, hidden_dim
+    return torch.stack(outputs, dim=0), [H, C]
+
 class DeepLSTMSequential(nn.Module):
   def __init__(self, input_dim, hidden_dim, num_layers, dropout=0.5):
-    super(DeepLSTM, self).__init__()
+    super(DeepLSTMSequential, self).__init__()
     self.input_dim = input_dim
     self.hidden_dim = hidden_dim
     self.num_layers = num_layers
@@ -105,11 +134,10 @@ class DeepLSTM(nn.Module):
       H.append(h), C.append(c)
     return [torch.stack(H), torch.stack(C)]
     
-  def forward(self, X, state):
+  def forward(self, X):
     # X: seq_len, batch_size, input_dim,
     # state = (H, C): num_layers, batch_size, hidden_dim
-    if state is None:
-      state = self.init_hidden(X.size()[1])
+    state = self.init_hidden(X.size()[1])
 
     last_hiddens, last_cells = [], []
     outputs, (hidden, cell) = self.input_layer(X, (state[0][0], state[1][0]))

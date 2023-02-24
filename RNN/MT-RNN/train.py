@@ -13,7 +13,7 @@ from datetime import datetime
 from utils import bleu_eval
 import random
 
-tb = SummaryWriter('./runs')
+tb = SummaryWriter('./runs/run1')
 
 class TrainingArgs(object):
   def __init__(self, epochs, lr, weight_decay, teaching_forcing, clip):

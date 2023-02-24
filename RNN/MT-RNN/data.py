@@ -119,20 +119,33 @@ class Tokenizer():
     tensor = tensor.detach().cpu().numpy()
     return [self.id_2_token[lang][id] for id in tensor]
 
-def collate_fn(data):
+def collate_fn_max_batch(data):
   eng, fra, fra_label = zip(*data)
   eng = torch.nn.utils.rnn.pad_sequence(eng, batch_first=True, padding_value=0)
   fra = torch.nn.utils.rnn.pad_sequence(fra, batch_first=True, padding_value=0)
   fra_label = torch.nn.utils.rnn.pad_sequence(fra_label, batch_first=True, padding_value=0)
   return eng, fra, fra_label
 
-def get_data_loader(filename, num_workers=4, batch_size=4, shuffle=True):
+def collate_fn_max_length(data, max_length=100):
+  # pad first seq to desired length
+  eng, frq, fra_label = zip(*data)
+  eng[0] = nn.ConstantPad1d((0, max_length - eng[0].shape[0]), 0)(eng[0])
+  eng = torch.nn.utils.rnn.pad_sequence(eng, batch_first=True, padding_value=0)
+  fra = torch.nn.utils.rnn.pad_sequence(fra, batch_first=True, padding_value=0)
+  fra_label = torch.nn.utils.rnn.pad_sequence(fra_label, batch_first=True, padding_value=0)
+  return eng, fra, fra_label 
+
+def get_data_loader(filename, num_workers=4, batch_size=4, shuffle=True, global_max_len=None):
   dataset = EngFranRawDataset(filename)
   dataset.read_data()
   dataset.build_vocab()
   train_data, val_data, test_data = dataset.split_train_val_test()
   tokenizer = dataset.get_tokenizer()
-
+  if global_max_len is not None:
+    collate_fn = lambda x: collate_fn_max_length(x, global_max_len)
+  else:
+    collate_fn = collate_fn_max_batch
+  
   return DataLoader(train_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn, pin_memory=True), \
          DataLoader(val_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn, pin_memory=True), \
          DataLoader(test_data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn, pin_memory=True), \

@@ -5,6 +5,7 @@ from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
 from data import get_data_loader
 from models.encoder_decoder import Encoder, Decoder, EncoderDecoder
+from models.attn_model import AttnEncoder, AttnDecoder, EncoderAttnDecoder
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
@@ -161,18 +162,30 @@ if __name__ == "__main__":
   train, val, test, tokenizer = \
     get_data_loader(batch_size=args.batch_size, 
                     num_workers=args.num_workers, 
-                    filename=args.data_path)
+                    filename=args.data_path,
+                    global_max_len=25)
   
-  encoder = Encoder(vocab_size=train.dataset.vocab_size['eng'],
+  # encoder = Encoder(vocab_size=train.dataset.vocab_size['eng'],
+  #                   embedding_size=256,
+  #                   hidden_size=256,
+  #                   num_layers=4,
+  #                   dropout=args.dropout).to(device)
+  encoder = EncoderAttn(vocab_size=train.dataset.vocab_size['eng'],
                     embedding_size=256,
                     hidden_size=256,
                     num_layers=4,
                     dropout=args.dropout).to(device)
-  decoder = Decoder(vocab_size=train.dataset.vocab_size['fra'],
+  # decoder = Decoder(vocab_size=train.dataset.vocab_size['fra'],
+  #                   embedding_size=256,
+  #                   hidden_size=256,
+  #                   num_layers=2,
+  #                   dropout=args.dropout).to(device)
+  decoder = DecoderAttn(vocab_size=train.dataset.vocab_size['fra'],
                     embedding_size=256,
                     hidden_size=256,
                     num_layers=2,
-                    dropout=args.dropout).to(device)
+                    dropout=args.dropout,
+                    max_length=20).to(device)
   
   training_args = TrainingArgs(
     epochs=args.epochs,

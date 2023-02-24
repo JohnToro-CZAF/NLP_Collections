@@ -6,9 +6,9 @@ from deep_lstm import DeepLSTM, DeepLSTMSequential
 def init_weight(module: nn.Module):
   if type(module) == nn.Linear:
     nn.init.xavier_uniform_(module.weight)
-class Encoder(nn.Module):
+class AttnEncoder(nn.Module):
   def __init__(self, vocab_size, embedding_size, hidden_size, num_layers, dropout):
-    super(Encoder, self).__init__()
+    super(AttnEncoder, self).__init__()
     self.vocab_size = vocab_size
     self.embedding_size = embedding_size
     self.hidden_size = hidden_size
@@ -75,22 +75,19 @@ class AttnDecoder(nn.Module):
       # hidden: num_layers, batch_size, hidden_size
       # cell: num_layers, batch_size, hidden_size
     """
-    print(y)
     embs = self.embedding(y) # batch_size, seq_len_decoder, embedding_size
     embs = self.dropout_nn(embs)
     H, C = H_C
     attn_history = []
     outputs = []
-    print(embs.size(), context.size(), H.size())
     for input in embs.transpose(0, 1): # batch_size, embedding_size
+      # TODO: Currenlty the attention is only applied to one layer only: how to scale to multiple layers?
       attn_scores = self.softmax(self.attn(torch.concat((H[0], input), -1)))
       # batch_size, max_len -> (batch_size, 1, max_len) * (batch_size, max_len, hidden_size)
-      print(attn_scores.size(), context.size())
       attn_vector = torch.bmm(attn_scores.unsqueeze(1), context)
       # new_input is fused version of input and attened vector
       attn_vector = attn_vector.squeeze(1) # batch_size, hidden_size
       new_input = self.attn_combined(torch.cat((attn_vector, input), -1))
-      print(new_input.size(), H.size(), C.size())
       output, (H, C) = self.lstm(new_input, (H, C))
       output = self.softmax(self.fc(output))
       outputs.append(output)
@@ -98,8 +95,10 @@ class AttnDecoder(nn.Module):
     return torch.stack(outputs, dim=0).transpose(0, 1), torch.stack(attn_history), (H, C)
 
 class EncoderAttnDecoder(nn.Module):
+  """
   # Note: with this type of model, we have to make sure that the input to the encoder, has to be equal to encoder_max_length,
   # since we fixed the length of the input, for self.attention
+  """
   def __init__(self, encoder, decoder):
     super(EncoderAttnDecoder, self).__init__()
     self.encoder = encoder
@@ -154,7 +153,6 @@ class EncoderAttnDecoder(nn.Module):
     for i in range(num_steps):
       distribution, attn_history, (H, C) = self.decoder(pred_tokens[:,-1].unsqueeze(1), encoded_input, (H, C)) # Take the last step of output
       # distribution: batch_size, 1, vocab_size
-      print(pred_tokens[:,-1].unsqueeze(1))
       pred_token = torch.argmax(distribution, dim=-1) # batch_size, 1
       pred_tokens = torch.cat((pred_tokens, pred_token), dim=-1)
       outputs.append(distribution.squeeze(1)) # -> batch_size, vocab_soze
@@ -164,7 +162,7 @@ class EncoderAttnDecoder(nn.Module):
     return torch.stack(outputs, dim=0).transpose(0,1), torch.cat(attn_scores, dim=0).transpose(0,1), pred_tokens
   
 if __name__  == "__main__":
-  encoder = Encoder(vocab_size=5, embedding_size=8, hidden_size=10, num_layers=2, dropout=0.5)
+  encoder = AttnEncoder(vocab_size=5, embedding_size=8, hidden_size=10, num_layers=2, dropout=0.5)
   decoder = AttnDecoder(vocab_size=6, embedding_size=8, hidden_size=10, num_layers=1, dropout=0.5, max_length=7)
   model = EncoderAttnDecoder(encoder, decoder)
   X = torch.randint(0, 4, (4, 7))

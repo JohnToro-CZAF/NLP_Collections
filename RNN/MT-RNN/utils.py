@@ -44,6 +44,8 @@ def bleu_eval(label_tokens: Union[str, List], pred_tokens: Union[str, List], k:i
     for gram in ngrams_pred:
       if gram in ngrams_label:
         matched +=1
+    if ngrams_pred == 0:
+      continue
     scores *= np.power(matched/len(ngrams_pred), np.power(0.5, n))
   return scores
 

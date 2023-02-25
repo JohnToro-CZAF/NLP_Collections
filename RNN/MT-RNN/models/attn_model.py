@@ -52,7 +52,7 @@ class AttnDecoder(nn.Module):
     self.attn_combined = nn.Linear(embedding_size+hidden_size, embedding_size)
     self.dropout_nn = nn.Dropout(dropout)
     self.fc = nn.Linear(hidden_size, vocab_size)
-    self.softmax = nn.Softmax(dim=-1)
+    self.softmax = nn.LogSoftmax(dim=-1)
     
   def _init_weight(self):
     self.lstm.init_weight(init_weight)
@@ -157,7 +157,6 @@ class EncoderAttnDecoder(nn.Module):
       pred_tokens = torch.cat((pred_tokens, pred_token), dim=-1)
       outputs.append(distribution.squeeze(1)) # -> batch_size, vocab_soze
       attn_scores.append(attn_history)
-    
     # outputs: num_steps, batch_size, vocab_size
     return torch.stack(outputs, dim=0).transpose(0,1), torch.cat(attn_scores, dim=0).transpose(0,1), pred_tokens
   

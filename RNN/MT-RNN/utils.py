@@ -34,6 +34,8 @@ def bleu_eval(label_tokens: Union[str, List], pred_tokens: Union[str, List], k:i
   print(pred_tokens)
   print(label_tokens)
   len_label, len_pred = len(label_tokens), len(pred_tokens)
+  if (len_pred == 0):
+    len_pred = 1 
   scores = np.exp(min(0,1-len_label/len_pred))
   for n in range(1, k+1):
     matched = 0

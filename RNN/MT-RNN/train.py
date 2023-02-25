@@ -14,7 +14,7 @@ from datetime import datetime
 from utils import bleu_eval
 import random
 
-tb = SummaryWriter('./runs/run3')
+tb = SummaryWriter('./runs/run4')
 attention = "attn"
 # attention = None
 
@@ -71,7 +71,6 @@ class Trainer(object):
           outputs = self.model(X, y)
 
         mask = (y != self.tokenizer.pad_token_id).float()
-        # print(mask)
         loss = self.criterion(outputs.reshape(-1, outputs.size()[-1]), torch.flatten(y_hat))
         loss = (loss * torch.flatten(mask)).sum() / mask.sum()
         running_loss += loss.item()
@@ -143,9 +142,6 @@ class Trainer(object):
             label_tokens = self.tokenizer.ids_2_tokens(label, lang='fra')
             source_tokens = self.tokenizer.ids_2_tokens(X[i], lang='eng')
             pred_tokens = self.tokenizer.ids_2_tokens(b, lang='fra')
-            # print("Source sentence", " ".join(source_tokens))
-            # print("Target sentence", " ".join(label_tokens))
-            # print("Predicted sentence", " ".join(pred_tokens))
             score_in_batch += bleu_eval(label_tokens[1:], pred_tokens[1:], k=5) # not consider <BOS> token in the begining
           
           score_in_batch /= y.size()[0]
@@ -166,7 +162,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--data_path', type=str, default='data/eng-fra.txt')
   parser.add_argument('--num_workers', type=int, default=16)
-  parser.add_argument('--batch_size', type=int, default=256)
+  parser.add_argument('--batch_size', type=int, default=300)
   parser.add_argument('--epochs', type=int, default=50)
   parser.add_argument('--lr', type=float, default=0.0001)
   parser.add_argument('--weight_decay', type=float, default=0.0001)
